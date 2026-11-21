@@ -34,8 +34,8 @@ export function LoginPage() {
   return (
     <main className="page narrow auth-page">
       <div className="stack-sm">
-        <h1 className="auth-title">Muscu</h1>
-        <p className="muted">Tes séances, tes charges, ta progression. Avec ton coach.</p>
+        <h1 className="auth-title">Praug</h1>
+        <p className="muted">Ton programme, tes charges, ta progression.</p>
       </div>
       <form onSubmit={onSubmit} aria-labelledby="login-title" className="card stack">
         <h2 id="login-title">{mode === 'login' ? 'Connexion' : 'Mot de passe oublié'}</h2>
