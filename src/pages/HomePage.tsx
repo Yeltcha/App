@@ -111,11 +111,11 @@ export function HomePage() {
           </div>
           {plan.data && plan.data.length > 0 && (
             <ul className="plan-list" aria-label={`Exercices de ${next.data.name}`}>
-              {plan.data.map((item) => {
+              {plan.data.map((item, index) => {
                 const name = exerciseMap.get(item.exercise_id)?.name
                 return (
                 <li key={item.id}>
-                  <span>{name ?? 'Exercice'}</span>
+                  <span><span className="station" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>{name ?? 'Exercice'}</span>
                   <span className="figure">
                     {item.target_sets} × {item.rep_max ? `${item.rep_min}–${item.rep_max}` : item.rep_min}
                     {item.target_weight_kg ? ` @ ${formatNumber(Number(item.target_weight_kg))} kg` : null}
