@@ -210,7 +210,7 @@ export default function ProfilePage() {
               <li key={g.id} className="row between wrap">
                 <span>
                   <strong>{exerciseMap.get(g.exercise_id)?.name}</strong> : {formatKg(Number(g.target_1rm_kg))} (1RM)
-                  {g.target_date && <span className="muted small"> · avant le {formatLongDate(g.target_date)}</span>}
+                  {g.target_date && <span className="muted small">, avant le {formatLongDate(g.target_date)}</span>}
                   {g.achieved_at && <span className="badge"> ✓ Atteint</span>}
                 </span>
                 <span className="row">

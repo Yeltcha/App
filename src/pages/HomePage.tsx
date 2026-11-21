@@ -3,12 +3,13 @@ import { Link, useNavigate } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
 import { supabase, unwrap } from '../lib/supabase'
-import { useGyms } from '../lib/queries'
 import { ACTIVE_SESSION_KEY, startSession, useActiveSession } from '../lib/sessions'
-import type { Program, SessionSummary, Workout } from '../lib/types'
+import { byId, useExercises, useGyms } from '../lib/queries'
+import type { Program, SessionSummary, Workout, WorkoutExercise } from '../lib/types'
 import { Dialog } from '../components/Dialog'
-import { ErrorMessage, Loading } from '../components/Feedback'
-import { formatDuration, formatLongDate, localDateOf } from '../lib/dates'
+import { Empty, ErrorMessage, Loading } from '../components/Feedback'
+import { SessionRow } from '../components/SessionRow'
+import { formatNumber } from '../lib/numbers'
 
 const LAST_GYM_KEY = 'muscu:last-gym'
 
@@ -49,6 +50,15 @@ export function HomePage() {
     },
   })
 
+  const plan = useQuery({
+    queryKey: ['workout-plan', next.data?.id],
+    enabled: Boolean(next.data?.id),
+    queryFn: async () =>
+      unwrap(await supabase.from('workout_exercises').select('*').eq('workout_id', next.data!.id)
+        .order('position')) as WorkoutExercise[],
+  })
+  const exerciseMap = byId(useExercises().data)
+
   const recent = useQuery({
     queryKey: ['summaries', userId, 'recent'],
     enabled: Boolean(userId),
@@ -78,67 +88,74 @@ export function HomePage() {
 
   const gymForWorkout = startFor?.gym_id ?? readLastGym()
 
+  const firstName = profile?.full_name.split(' ')[0] || ''
+
   return (
     <div className="stack-lg">
-      <h1>Bonjour {profile?.full_name.split(' ')[0] || ''}</h1>
+      <h1 className="greeting">Bonjour {firstName}</h1>
 
       {active.data ? (
-        <section className="card highlight" aria-labelledby="active-title">
-          <h2 id="active-title">Séance en cours</h2>
-          <p>{active.data.name}</p>
-          <Link to="/seance" className="button primary">Reprendre la séance</Link>
+        <section className="card today live" aria-labelledby="active-title">
+          <p className="today-label" id="active-title">Séance en cours</p>
+          <h2 className="today-title">{active.data.name}</h2>
+          <Link to="/seance" className="button primary cta">Reprendre la séance</Link>
+        </section>
+      ) : next.isPending ? <Loading /> : next.data ? (
+        <section className="card today" aria-labelledby="next-title">
+          <div className="stack-sm">
+            <p className="today-label">Prochaine séance</p>
+            <h2 className="today-title" id="next-title">{next.data.name}</h2>
+            {program.data && <p className="muted">Programme : {program.data.name}</p>}
+          </div>
+          {plan.data && plan.data.length > 0 && (
+            <ul className="plan-list" aria-label={`Exercices de ${next.data.name}`}>
+              {plan.data.map((item) => (
+                <li key={item.id}>
+                  <span>{exerciseMap.get(item.exercise_id)?.name ?? 'Exercice'}</span>
+                  <span className="figure">
+                    {item.target_sets} × {item.rep_max ? `${item.rep_min}–${item.rep_max}` : item.rep_min}
+                    {item.target_weight_kg ? ` @ ${formatNumber(Number(item.target_weight_kg))} kg` : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" className="primary cta" onClick={() => setStartFor(next.data)}>
+            Démarrer {next.data.name}
+          </button>
+          <div className="today-actions">
+            <button type="button" className="link" onClick={() => setStartFor(null)}>Séance libre</button>
+            {program.data && program.data.workouts.length > 1 && (
+              <details className="other-workouts">
+                <summary>Choisir une autre séance du programme</summary>
+                <ul className="plain-list">
+                  {program.data.workouts.map((w) => (
+                    <li key={w.id}>
+                      <button type="button" className="link" onClick={() => setStartFor(w)}>{w.name}</button>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
         </section>
       ) : (
-        <section className="card" aria-labelledby="next-title">
-          <h2 id="next-title">Prochaine séance</h2>
-          {next.isPending ? <Loading /> : next.data ? (
-            <>
-              <p className="lead">{next.data.name}</p>
-              {program.data && <p className="muted">Programme : {program.data.name}</p>}
-              <div className="row wrap">
-                <button type="button" className="primary" onClick={() => setStartFor(next.data)}>
-                  Démarrer {next.data.name}
-                </button>
-                <button type="button" onClick={() => setStartFor(null)}>Séance libre</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="muted">Aucun programme actif ne t’est attribué pour l’instant.</p>
-              <button type="button" className="primary" onClick={() => setStartFor(null)}>Démarrer une séance libre</button>
-            </>
-          )}
-          {program.data && program.data.workouts.length > 1 && !active.data && (
-            <details className="other-workouts">
-              <summary>Choisir une autre séance du programme</summary>
-              <ul className="plain-list">
-                {program.data.workouts.map((w) => (
-                  <li key={w.id}>
-                    <button type="button" className="link" onClick={() => setStartFor(w)}>{w.name}</button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
+        <section className="card today" aria-labelledby="next-title">
+          <h2 className="today-title" id="next-title">Séance libre</h2>
+          <p className="muted">Aucun programme ne t’est attribué pour l’instant. Lance une séance libre et choisis tes exercices au fil de l’eau.</p>
+          <button type="button" className="primary cta" onClick={() => setStartFor(null)}>Démarrer une séance libre</button>
         </section>
       )}
 
       <section aria-labelledby="recent-title" className="stack">
-        <div className="row between">
+        <div className="section-head">
           <h2 id="recent-title">Dernières séances</h2>
-          <Link to="/historique">Tout voir</Link>
+          {recent.data && recent.data.length > 0 && <Link to="/historique">Tout voir</Link>}
         </div>
-        {recent.data?.length === 0 && <p className="muted">Pas encore de séance terminée.</p>}
-        <ul className="plain-list stack">
+        {recent.data?.length === 0 && <Empty>Tes séances terminées apparaîtront ici.</Empty>}
+        <ul className="plain-list session-list">
           {recent.data?.map((s) => (
-            <li key={s.session_id}>
-              <Link to={`/historique/${s.session_id}`} className="card link-card">
-                <strong>{s.name}</strong>
-                <span className="muted">
-                  {formatLongDate(localDateOf(s.started_at))} · {formatDuration(Date.parse(s.started_at), Date.parse(s.ended_at))} · {s.sets_done} séries
-                </span>
-              </Link>
-            </li>
+            <li key={s.session_id}><SessionRow summary={s} /></li>
           ))}
         </ul>
       </section>

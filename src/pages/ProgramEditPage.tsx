@@ -268,9 +268,9 @@ function PlanRow({ item, index, count, onEdit, onMove, onDelete }: {
   const reps = item.rep_max ? `${item.rep_min}–${item.rep_max}` : `${item.rep_min}`
   return (
     <li className="row between wrap plan-row">
-      <span>
+      <span className="item-text">
         <strong>{name}</strong>
-        <span className="muted small"> · {item.target_sets} × {reps}{item.target_weight_kg ? ` @ ${String(item.target_weight_kg).replace('.', ',')} kg` : ''} · repos {item.rest_sec} s</span>
+        <span className="muted small">{item.target_sets} × {reps}{item.target_weight_kg ? ` @ ${String(item.target_weight_kg).replace('.', ',')} kg` : ''}, repos {item.rest_sec} s</span>
       </span>
       <span className="row">
         <button type="button" className="icon-button" aria-label={`Monter ${name}`} disabled={index === 0} onClick={() => onMove(-1)}>↑</button>

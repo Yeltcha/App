@@ -47,7 +47,7 @@ export default function ProgramsPage() {
               <strong>{p.name}</strong>
               <span className="muted small">
                 {p.athlete_id ? `Attribué à ${people.get(p.athlete_id)?.full_name ?? '…'}` : 'Modèle non attribué'}
-                {!p.is_active && ' · inactif'}
+                {!p.is_active && <> <span className="badge">Inactif</span></>}
               </span>
             </Link>
           </li>
