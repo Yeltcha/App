@@ -29,6 +29,8 @@ export default defineConfig({
       workbox: {
         navigateFallback: '/index.html',
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Police : seuls les jeux latins sont mis en cache hors ligne
+        globIgnores: ['**/*vietnamese*'],
       },
     }),
   ],

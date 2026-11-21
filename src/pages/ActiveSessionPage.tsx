@@ -23,8 +23,8 @@ export default function ActiveSessionPage() {
     return (
       <div className="stack">
         <h1>Séance</h1>
-        <Empty>Aucune séance en cours.</Empty>
-        <Link to="/" className="button primary">Démarrer une séance</Link>
+        <Empty>Aucune séance en cours. Démarre la prochaine séance de ton programme ou une séance libre depuis l’accueil.</Empty>
+        <Link to="/" className="button primary cta">Démarrer une séance</Link>
       </div>
     )
   }
@@ -172,15 +172,21 @@ function SessionRunner({ session }: { session: Session }) {
   }
 
   const doneCount = sets.data?.filter((s) => s.done).length ?? 0
+  const total = sets.data?.length ?? 0
 
   return (
     <div className="stack-lg session-runner">
-      <div>
+      <header className="page-head">
         <h1>{session.name}</h1>
-        <p className="muted">
-          {gym ? gym.name : 'Aucune salle précise'} · commencée il y a {formatDuration(Date.parse(session.started_at), now)} · {doneCount}/{sets.data?.length ?? 0} séries faites
+        <p className="meta">
+          <span>{gym ? gym.name : 'Aucune salle précise'}</span>
+          <span>Commencée il y a {formatDuration(Date.parse(session.started_at), now)}</span>
         </p>
-      </div>
+        <div className="session-progress">
+          <progress id="session-progress" max={Math.max(1, total)} value={doneCount} aria-label="Séries faites" />
+          <output htmlFor="session-progress">{doneCount} sur {total} séries</output>
+        </div>
+      </header>
       <ErrorMessage error={error} />
 
       {sets.isPending && <Loading />}
@@ -194,17 +200,17 @@ function SessionRunner({ session }: { session: Session }) {
         return (
           <section key={position} className="card exercise-block" aria-labelledby={headingId}>
             <h2 id={headingId}>{exercise?.name ?? 'Exercice'}</h2>
-            <p className="muted small">
-              {eq && <>{eq.name}{eq.brand ? ` (${eq.brand})` : ''} · </>}
-              {prev ? `Dernière fois : ${formatKg(prev.weight_kg)} × ${prev.reps}` : 'Première fois sur cet exercice'}
+            <p className="muted small exercise-meta">
+              {eq && <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>}
+              <span>{prev ? `Dernière fois : ${formatKg(prev.weight_kg)} × ${prev.reps}` : 'Première fois sur cet exercice'}</span>
             </p>
             <table className="sets-table">
               <caption className="visually-hidden">Séries de {exercise?.name}</caption>
               <thead>
                 <tr>
                   <th scope="col">Série</th>
-                  <th scope="col">Charge (kg)</th>
-                  <th scope="col">Répétitions</th>
+                  <th scope="col">kg</th>
+                  <th scope="col">Reps</th>
                   <th scope="col">Faite</th>
                   <th scope="col"><span className="visually-hidden">Supprimer</span></th>
                 </tr>
@@ -218,15 +224,17 @@ function SessionRunner({ session }: { session: Session }) {
                 ))}
               </tbody>
             </table>
-            <button type="button" onClick={() => addSet(group)}>+ Ajouter une série</button>
+            <button type="button" className="add-set" onClick={() => addSet(group)}>+ Ajouter une série</button>
           </section>
         )
       })}
 
-      <div className="row wrap">
+      <div className="session-actions">
         <button type="button" onClick={() => setPicking(true)}>+ Ajouter un exercice</button>
-        <button type="button" className="primary" onClick={() => setFinishing(true)}>Terminer la séance</button>
-        <button type="button" className="danger-link" onClick={() => setAbandoning(true)}>Abandonner</button>
+        <button type="button" className="primary cta" onClick={() => setFinishing(true)}>Terminer la séance</button>
+        <div className="secondary-actions">
+          <button type="button" className="danger-link" onClick={() => setAbandoning(true)}>Abandonner</button>
+        </div>
       </div>
 
       <RestTimer endsAt={restEndsAt} onChange={setRestEndsAt} />

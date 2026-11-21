@@ -46,16 +46,21 @@ export default function SessionDetailPage() {
 
   return (
     <div className="stack-lg">
-      <div>
+      <header className="page-head">
         <h1>{session.name}</h1>
-        <p className="muted">
-          {formatLongDate(localDateOf(session.started_at))}
-          {session.ended_at && ` · ${formatDuration(Date.parse(session.started_at), Date.parse(session.ended_at))}`}
-          {session.gym_id && gyms.get(session.gym_id) && ` · ${gyms.get(session.gym_id)!.name}`}
-          {session.rpe && ` · RPE ${session.rpe}`}
-        </p>
+        <p className="muted">{formatLongDate(localDateOf(session.started_at))}</p>
+        <dl className="session-facts">
+          {session.ended_at && (
+            <div className="fact"><dt>durée</dt><dd>{formatDuration(Date.parse(session.started_at), Date.parse(session.ended_at))}</dd></div>
+          )}
+          <div className="fact"><dt>séries</dt><dd>{sets.length}</dd></div>
+          {session.rpe && <div className="fact"><dt>RPE</dt><dd>{session.rpe}/10</dd></div>}
+          {session.gym_id && gyms.get(session.gym_id) && (
+            <div className="fact"><dt>salle</dt><dd>{gyms.get(session.gym_id)!.name}</dd></div>
+          )}
+        </dl>
         {session.notes && <p className="notes">{session.notes}</p>}
-      </div>
+      </header>
       <ErrorMessage error={error} />
 
       {[...groups.entries()].map(([pos, group]) => {

@@ -33,8 +33,10 @@ export function LoginPage() {
 
   return (
     <main className="page narrow auth-page">
-      <h1>Muscu</h1>
-      <p className="muted">Suivi d’entraînement entre coach et athlètes.</p>
+      <div className="stack-sm">
+        <h1 className="auth-title">Muscu</h1>
+        <p className="muted">Tes séances, tes charges, ta progression. Avec ton coach.</p>
+      </div>
       <form onSubmit={onSubmit} aria-labelledby="login-title" className="card stack">
         <h2 id="login-title">{mode === 'login' ? 'Connexion' : 'Mot de passe oublié'}</h2>
         <div className="field">

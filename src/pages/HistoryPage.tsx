@@ -1,11 +1,10 @@
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
 import { supabase, unwrap } from '../lib/supabase'
 import { byId, useGyms, useProfiles } from '../lib/queries'
 import type { SessionSummary } from '../lib/types'
-import { formatDuration, formatLongDate, localDateOf } from '../lib/dates'
-import { formatKg } from '../lib/numbers'
+import { SessionRow } from '../components/SessionRow'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
 
 export default function HistoryPage() {
@@ -36,19 +35,11 @@ export default function HistoryPage() {
       )}
       {summaries.isPending && <Loading />}
       <ErrorMessage error={summaries.error} />
-      {summaries.data?.length === 0 && <Empty>Aucune séance terminée pour l’instant.</Empty>}
-      <ul className="plain-list stack">
+      {summaries.data?.length === 0 && <Empty>Aucune séance terminée pour l’instant. Termine ta première séance pour la retrouver ici.</Empty>}
+      <ul className="plain-list session-list">
         {summaries.data?.map((s) => (
           <li key={s.session_id}>
-            <Link to={`/historique/${s.session_id}`} className="card link-card">
-              <strong>{s.name}</strong>
-              <span>{formatLongDate(localDateOf(s.started_at))}</span>
-              <span className="muted small">
-                {formatDuration(Date.parse(s.started_at), Date.parse(s.ended_at))} · {s.sets_done} séries · {formatKg(Number(s.volume_kg))} soulevés
-                {s.rpe ? ` · RPE ${s.rpe}` : ''}
-                {s.gym_id && gyms.get(s.gym_id) ? ` · ${gyms.get(s.gym_id)!.name}` : ''}
-              </span>
-            </Link>
+            <SessionRow summary={s} detailed gymName={s.gym_id ? gyms.get(s.gym_id)?.name : undefined} />
           </li>
         ))}
       </ul>

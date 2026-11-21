@@ -70,9 +70,9 @@ function ExercisesSection() {
       <ul className="plain-list stack">
         {list.map((ex) => (
           <li key={ex.id} className="card row between wrap">
-            <span>
+            <span className="item-text">
               <strong>{ex.name}</strong>
-              <span className="muted small"> · {MUSCLE_LABELS[ex.muscle_group]}{ex.requires_equipment ? ' · machine requise' : ''}</span>
+              <span className="muted small">{MUSCLE_LABELS[ex.muscle_group]}{ex.requires_equipment ? ', machine requise' : ''}</span>
             </span>
             <span className="row">
               <button type="button" onClick={() => setEditing(ex)}>Modifier</button>
@@ -247,7 +247,7 @@ function GymsSection() {
               <ul className="plain-list">
                 {items.map((eq) => (
                   <li key={eq.id} className="row between">
-                    <span>{eq.name}{eq.brand && <span className="muted"> · {eq.brand}</span>} <span className="badge">{EQUIPMENT_LABELS[eq.kind]}</span></span>
+                    <span>{eq.name}{eq.brand && <span className="muted"> ({eq.brand})</span>} <span className="badge">{EQUIPMENT_LABELS[eq.kind]}</span></span>
                     <button type="button" className="icon-button" aria-label={`Supprimer ${eq.name}`} onClick={() => setDeleting({ kind: 'equipment', item: eq })}>
                       <span aria-hidden="true">✕</span>
                     </button>
