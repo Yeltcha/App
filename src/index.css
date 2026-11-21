@@ -4,30 +4,30 @@
 :root {
   color-scheme: dark;
 
-  /* Palette */
-  --sous-bois: #37413a;   /* fond principal, PANTONE 19-6110 TCX « Deep Forest » */
-  --feuillage: #455249;   /* accent secondaire, même teinte plus claire */
-  --mousse: #56655a;      /* contrôles secondaires */
-  --craie: #eef1ea;       /* texte principal */
-  --lichen: #c3cec6;      /* texte secondaire */
-  --volt: #c8f53c;        /* action et réussite, rien d'autre */
+  /* Palette sombre et neutre */
+  --graphite: #141516;    /* fond principal */
+  --ardoise: #1f2022;     /* panneaux, barre d'onglets */
+  --acier: #2c2d30;       /* contrôles secondaires */
+  --blanc: #f2f2f0;       /* texte principal */
+  --cendre: #a4a7ab;      /* texte secondaire */
+  --surbrillance: #e6e6e3;/* action et réussite */
 
-  --bg: var(--sous-bois);
-  --surface: var(--feuillage);
-  --control: var(--mousse);
-  --text: var(--craie);
-  --text-muted: var(--lichen);
-  --line: color-mix(in oklab, var(--craie) 14%, transparent);
-  --field-border: #95a499;
-  --brand: var(--volt);
-  --on-brand: #1b231d;
-  --done-bg: color-mix(in oklab, var(--volt) 20%, var(--feuillage));
-  --danger: #ffb3a6;
+  --bg: var(--graphite);
+  --surface: var(--ardoise);
+  --control: var(--acier);
+  --text: var(--blanc);
+  --text-muted: var(--cendre);
+  --line: color-mix(in oklab, var(--blanc) 10%, transparent);
+  --field-border: #6c6f74;
+  --brand: var(--surbrillance);
+  --on-brand: var(--graphite);
+  --done-bg: #3a3b3d;
+  --danger: #ff9d8c;
 
-  --series-1: var(--volt);
-  --chart-grid: color-mix(in oklab, var(--craie) 12%, transparent);
-  --chart-axis: var(--mousse);
-  --surface-raised: var(--feuillage);
+  --series-1: var(--surbrillance);
+  --chart-grid: color-mix(in oklab, var(--blanc) 10%, transparent);
+  --chart-axis: var(--acier);
+  --surface-raised: var(--ardoise);
 
   /* Typographie : une famille, la largeur porte le sens */
   --font: 'Archivo Variable', 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -50,7 +50,7 @@
   --gutter: max(1rem, env(safe-area-inset-left, 0px));
 
   accent-color: var(--brand);
-  scrollbar-color: var(--mousse) var(--sous-bois);
+  scrollbar-color: var(--acier) var(--graphite);
   font-family: var(--font);
   font-size: 100%;
   line-height: 1.5;
@@ -61,7 +61,7 @@
 }
 
 @supports not (color: color-mix(in oklab, red, blue)) {
-  :root { --line: #5a685e; --done-bg: #5b6b45; --chart-grid: #56655a; }
+  :root { --line: #2a2b2e; --chart-grid: #2a2b2e; }
 }
 
 @media (pointer: coarse) {
@@ -182,7 +182,7 @@ button, .button {
   touch-action: manipulation;
   transition: background-color 120ms ease-out, filter 120ms ease-out;
 }
-button:hover:not(:disabled), .button:hover { background: color-mix(in oklab, var(--mousse) 80%, var(--craie)); }
+button:hover:not(:disabled), .button:hover { background: color-mix(in oklab, var(--acier) 82%, var(--blanc)); }
 button:active:not(:disabled), .button:active { filter: brightness(0.92); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -248,7 +248,7 @@ legend { font-weight: 600; padding-inline: 0.25rem; }
   min-block-size: max(var(--target-size), 2.5rem); cursor: pointer; font-weight: 600;
 }
 .segmented input { position: absolute; opacity: 0; pointer-events: none; }
-.segmented label:has(:checked) { background: var(--craie); color: var(--on-brand); }
+.segmented label:has(:checked) { background: var(--brand); color: var(--on-brand); }
 .segmented label:has(:focus-visible) { outline: 3px solid var(--brand); outline-offset: 2px; }
 
 /* ==========================================================================
@@ -399,7 +399,7 @@ details > summary {
   color: var(--text);
   text-decoration: none;
 }
-.session-row:hover { background: color-mix(in oklab, var(--surface) 70%, var(--mousse)); }
+.session-row:hover { background: var(--control); }
 .session-row .name { font-weight: 700; font-size: var(--step-1); }
 .session-row .date { color: var(--text-muted); font-size: var(--step--1); }
 .session-row .facts {
@@ -456,7 +456,7 @@ dialog {
 }
 dialog:modal { overscroll-behavior: contain; }
 dialog::backdrop {
-  background: rgb(14 20 16 / 0.7);
+  background: rgb(0 0 0 / 0.65);
   overflow: hidden;
   overscroll-behavior: contain;
 }
@@ -547,7 +547,7 @@ dialog::backdrop {
 .check input[type='checkbox']:checked { background: var(--brand); border-color: var(--brand); }
 .check input[type='checkbox']:checked::after { scale: 1; }
 .check input[type='checkbox']:active { scale: 0.94; }
-.check input[type='checkbox']:focus-visible { outline: 3px solid var(--craie); outline-offset: 2px; }
+.check input[type='checkbox']:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
 @media (forced-colors: active) {
   .check input[type='checkbox'] { appearance: auto; inline-size: 1.5rem; block-size: 1.5rem; }
   .check input[type='checkbox']::after { content: none; }
@@ -580,19 +580,19 @@ dialog::backdrop {
   border-radius: var(--r-panel);
   background: var(--brand);
   color: var(--on-brand);
-  box-shadow: 0 10px 30px rgb(14 20 16 / 0.45);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
   overflow: hidden;
 }
 .rest-bar.done { display: block; font-weight: 750; font-size: var(--step-1); text-align: center; }
 .rest-bar button {
-  background: rgb(27 35 29 / 0.1);
+  background: rgb(20 21 22 / 0.08);
   color: inherit;
   padding-inline: 0.7rem;
   font-size: var(--step--1);
   font-weight: 700;
   white-space: nowrap;
 }
-.rest-bar button:hover:not(:disabled) { background: rgb(27 35 29 / 0.18); }
+.rest-bar button:hover:not(:disabled) { background: rgb(20 21 22 / 0.16); }
 .rest-time { display: grid; line-height: 1; }
 .rest-label { font-size: 0.75rem; font-weight: 700; }
 .rest-clock { font-size: var(--step-3); font-weight: 850; letter-spacing: -0.01em; }
