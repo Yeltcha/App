@@ -2,36 +2,39 @@
    Jetons de design : clair / sombre selon les préférences du système
    ========================================================================== */
 :root {
-  color-scheme: light dark;
+  /* Thème unique sombre construit sur PANTONE 19-6110 TCX « Deep Forest » (#37413A) */
+  color-scheme: dark;
 
-  --brand-light: oklch(52% 0.19 255);
-  --brand-dark: oklch(72% 0.15 250);
-  --danger-light: oklch(52% 0.2 25);
-  --danger-dark: oklch(72% 0.17 25);
+  --forest: #37413a;        /* arrière-plan principal */
+  --forest-2: #455249;      /* accent secondaire : même teinte, plus claire */
+  --forest-3: #515f55;
+  --forest-4: #5f7064;
+  --volt: #c8f53c;          /* accent de contraste : vert « volt » sport et performance */
 
-  --bg: light-dark(#f6f6f4, #121212);
-  --surface: light-dark(#ffffff, #1c1c1b);
-  --surface-raised: light-dark(#ffffff, #262625);
-  --text: light-dark(#141414, #f0efec);
-  --text-muted: light-dark(#5a5955, #b4b3ab);
-  --border: light-dark(#767676, #8a8a85);
-  --border-soft: light-dark(#e2e1dc, #34342f);
-  --brand: light-dark(var(--brand-light), var(--brand-dark));
-  --on-brand: light-dark(#fff, #0d1424);
-  --brand-soft: light-dark(oklch(95% 0.03 255), oklch(30% 0.06 255));
-  --danger: light-dark(var(--danger-light), var(--danger-dark));
-  --success: light-dark(#1a6b2d, #6fd18a);
+  --bg: var(--forest);
+  --surface: var(--forest-2);
+  --surface-raised: var(--forest-2);
+  --field: var(--forest);
+  --text: #f3f6f1;
+  --text-muted: #d0d9d2;
+  --border: #a2b0a6;
+  --border-soft: var(--forest-4);
+  --brand: var(--volt);
+  --on-brand: #1b231d;
+  --brand-soft: color-mix(in oklab, var(--volt) 16%, var(--forest-2));
+  --danger: #ffb3a6;
+  --success: var(--volt);
 
-  --series-1: light-dark(#2a78d6, #3987e5);
-  --chart-grid: light-dark(#ebeae6, #2c2c2a);
-  --chart-axis: light-dark(#b9b8b2, #55554f);
+  --series-1: var(--volt);
+  --chart-grid: var(--forest-3);
+  --chart-axis: var(--forest-4);
 
   --radius: 12px;
   --target-size: 24px;
   --tab-bar-height: 4rem;
 
   accent-color: var(--brand);
-  scrollbar-color: light-dark(#8a8a8a, #6b6b6b) transparent;
+  scrollbar-color: var(--forest-4) var(--forest);
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
@@ -40,22 +43,8 @@
   -webkit-text-size-adjust: 100%;
 }
 
-/* Repli pour les navigateurs sans light-dark() */
-@supports not (color: light-dark(white, black)) {
-  :root {
-    --bg: #f6f6f4; --surface: #fff; --surface-raised: #fff; --text: #141414; --text-muted: #5a5955;
-    --border: #767676; --border-soft: #e2e1dc; --brand: var(--brand-light); --on-brand: #fff;
-    --brand-soft: oklch(95% 0.03 255); --danger: var(--danger-light); --success: #1a6b2d;
-    --series-1: #2a78d6; --chart-grid: #ebeae6; --chart-axis: #b9b8b2;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #121212; --surface: #1c1c1b; --surface-raised: #262625; --text: #f0efec; --text-muted: #b4b3ab;
-      --border: #8a8a85; --border-soft: #34342f; --brand: var(--brand-dark); --on-brand: #0d1424;
-      --brand-soft: oklch(30% 0.06 255); --danger: var(--danger-dark); --success: #6fd18a;
-      --series-1: #3987e5; --chart-grid: #2c2c2a; --chart-axis: #55554f;
-    }
-  }
+@supports not (color: color-mix(in oklab, red, blue)) {
+  :root { --brand-soft: #56683a; }
 }
 
 @media (pointer: coarse) {
@@ -125,7 +114,7 @@ input:not([type='checkbox'], [type='radio'], [type='range']), select, textarea {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--field);
 }
 
 input:user-invalid, select:user-invalid, textarea:user-invalid {
@@ -163,6 +152,8 @@ button.primary, .button.primary {
   background: var(--brand);
   border-color: var(--brand);
   color: var(--on-brand);
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 button.primary:hover:not(:disabled) { background: var(--brand); filter: brightness(1.08); }
 
@@ -232,7 +223,7 @@ legend { font-weight: 600; padding-inline: 0.25rem; }
   backdrop-filter: blur(10px);
   border-block-end: 1px solid var(--border-soft);
 }
-.brand { font-weight: 800; font-size: 1.2rem; color: var(--text); text-decoration: none; }
+.brand { font-weight: 900; font-size: 1.25rem; color: var(--volt); text-decoration: none; letter-spacing: 0.04em; text-transform: uppercase; }
 .user-name { margin-inline-start: auto; font-size: 0.9rem; }
 
 .staff-nav { display: flex; flex-wrap: wrap; gap: 0.25rem; }
@@ -242,7 +233,7 @@ legend { font-weight: 600; padding-inline: 0.25rem; }
   color: var(--text); text-decoration: none; font-size: 0.9rem; font-weight: 600;
 }
 .staff-nav a svg { inline-size: 18px; block-size: 18px; }
-.staff-nav a[aria-current='page'] { background: var(--brand-soft); color: var(--brand); }
+.staff-nav a[aria-current='page'] { background: var(--brand-soft); color: var(--text); box-shadow: inset 0 -2px 0 var(--volt); }
 
 .page {
   max-inline-size: 48rem;
@@ -293,7 +284,7 @@ legend { font-weight: 600; padding-inline: 0.25rem; }
   border-radius: var(--radius);
   padding: 1rem;
 }
-.card.highlight { border-color: var(--brand); background: var(--brand-soft); display: grid; gap: 0.6rem; }
+.card.highlight { border-color: var(--volt); background: var(--brand-soft); display: grid; gap: 0.6rem; }
 .card.stack, .card.highlight { display: flex; flex-direction: column; gap: 0.75rem; }
 section.card:not(.stack) { display: grid; gap: 0.6rem; }
 
@@ -327,7 +318,7 @@ dialog {
 }
 dialog:modal { overscroll-behavior: contain; }
 dialog::backdrop {
-  background: rgb(0 0 0 / 0.45);
+  background: rgb(10 14 11 / 0.65);
   overflow: hidden;
   overscroll-behavior: contain;
 }
@@ -371,7 +362,7 @@ dialog::backdrop {
 }
 .rest-bar.done { font-weight: 700; }
 .rest-bar button { background: transparent; color: inherit; border-color: currentColor; padding-inline: 0.6rem; font-size: 0.9rem; white-space: nowrap; }
-.rest-bar button:hover { background: rgb(255 255 255 / 0.15); }
+.rest-bar button:hover { background: rgb(0 0 0 / 0.08); }
 .rest-label { font-weight: 600; }
 @media (max-width: 24rem) { .rest-label { display: none; } }
 .rest-clock { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; min-inline-size: 4ch; text-align: center; }
@@ -388,7 +379,7 @@ dialog::backdrop {
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin: 0; }
 .kpi { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 0.85rem 1rem; }
 .kpi dt { font-size: 0.85rem; color: var(--text-muted); }
-.kpi dd { margin: 0.15rem 0 0; font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.kpi dd { margin: 0.15rem 0 0; font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--volt); }
 
 .featured { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.75rem; }
 .featured .card { display: grid; gap: 0.35rem; }
