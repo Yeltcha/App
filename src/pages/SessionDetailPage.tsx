@@ -1,0 +1,82 @@
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { supabase, unwrap } from '../lib/supabase'
+import { byId, useEquipment, useExercises, useGyms } from '../lib/queries'
+import type { Session, SessionSet } from '../lib/types'
+import { formatDuration, formatLongDate, localDateOf } from '../lib/dates'
+import { estimate1RM, formatKg } from '../lib/numbers'
+import { ConfirmDialog } from '../components/Dialog'
+import { ErrorMessage, Loading } from '../components/Feedback'
+
+export default function SessionDetailPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const exercises = byId(useExercises().data)
+  const equipment = byId(useEquipment().data)
+  const gyms = byId(useGyms().data)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<unknown>(null)
+
+  const data = useQuery({
+    queryKey: ['session-detail', id],
+    queryFn: async () => {
+      const session = unwrap(await supabase.from('sessions').select('*').eq('id', id!).single()) as Session
+      const sets = unwrap(await supabase.from('session_sets').select('*').eq('session_id', id!)
+        .order('exercise_position').order('set_number')) as SessionSet[]
+      return { session, sets }
+    },
+  })
+
+  if (data.isPending) return <Loading />
+  if (data.error) return <ErrorMessage error={data.error} />
+  const { session, sets } = data.data
+
+  const groups = new Map<number, SessionSet[]>()
+  for (const s of sets) groups.set(s.exercise_position, [...(groups.get(s.exercise_position) ?? []), s])
+
+  async function remove() {
+    setConfirming(false)
+    const { error } = await supabase.from('sessions').delete().eq('id', session.id)
+    if (error) return setError(error.message)
+    await queryClient.invalidateQueries()
+    navigate('/historique')
+  }
+
+  return (
+    <div className="stack-lg">
+      <div>
+        <h1>{session.name}</h1>
+        <p className="muted">
+          {formatLongDate(localDateOf(session.started_at))}
+          {session.ended_at && ` · ${formatDuration(Date.parse(session.started_at), Date.parse(session.ended_at))}`}
+          {session.gym_id && gyms.get(session.gym_id) && ` · ${gyms.get(session.gym_id)!.name}`}
+          {session.rpe && ` · RPE ${session.rpe}`}
+        </p>
+        {session.notes && <p className="notes">{session.notes}</p>}
+      </div>
+      <ErrorMessage error={error} />
+
+      {[...groups.entries()].map(([pos, group]) => {
+        const ex = exercises.get(group[0].exercise_id)
+        const eq = group[0].equipment_id ? equipment.get(group[0].equipment_id) : undefined
+        const best = Math.max(...group.map((s) => estimate1RM(Number(s.weight_kg), s.reps) ?? 0))
+        return (
+          <section key={pos} className="card" aria-labelledby={`d-${pos}`}>
+            <h2 id={`d-${pos}`}>{ex?.name}</h2>
+            {eq && <p className="muted small">{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</p>}
+            <ol className="set-summary">
+              {group.map((s) => <li key={s.id}>{formatKg(Number(s.weight_kg))} × {s.reps}</li>)}
+            </ol>
+            {best > 0 && <p className="small muted">1RM estimé : {formatKg(best)}</p>}
+          </section>
+        )
+      })}
+
+      <button type="button" className="danger-link" onClick={() => setConfirming(true)}>Supprimer cette séance</button>
+      <ConfirmDialog open={confirming} title="Supprimer la séance ?" message="Cette séance et ses séries seront définitivement supprimées."
+        confirmLabel="Supprimer" onConfirm={remove} onCancel={() => setConfirming(false)} />
+    </div>
+  )
+}

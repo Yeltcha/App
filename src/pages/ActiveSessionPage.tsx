@@ -1,0 +1,367 @@
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '../lib/auth'
+import { supabase, unwrap } from '../lib/supabase'
+import { byId, useEquipment, useExercises, useGymExercises, useGyms } from '../lib/queries'
+import { ACTIVE_SESSION_KEY, lastPerformances, useActiveSession } from '../lib/sessions'
+import { MUSCLE_LABELS, type Exercise, type Session, type SessionSet } from '../lib/types'
+import { formatKg, parseDecimal } from '../lib/numbers'
+import { formatDuration } from '../lib/dates'
+import { ConfirmDialog, Dialog } from '../components/Dialog'
+import { Empty, ErrorMessage, Loading } from '../components/Feedback'
+import { RestTimer } from '../components/RestTimer'
+import { readRestEnd, writeRestEnd } from '../lib/restStorage'
+
+export default function ActiveSessionPage() {
+  const { profile } = useAuth()
+  const active = useActiveSession(profile?.id)
+
+  if (active.isPending) return <Loading />
+  if (active.error) return <ErrorMessage error={active.error} />
+  if (!active.data) {
+    return (
+      <div className="stack">
+        <h1>Séance</h1>
+        <Empty>Aucune séance en cours.</Empty>
+        <Link to="/" className="button primary">Démarrer une séance</Link>
+      </div>
+    )
+  }
+  return <SessionRunner session={active.data} />
+}
+
+function SessionRunner({ session }: { session: Session }) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const exercises = useExercises()
+  const gyms = useGyms()
+  const equipment = useEquipment()
+  const exerciseMap = byId(exercises.data)
+  const equipmentMap = byId(equipment.data)
+  const gym = gyms.data?.find((g) => g.id === session.gym_id)
+  const [error, setError] = useState<unknown>(null)
+  const [picking, setPicking] = useState(false)
+  const [finishing, setFinishing] = useState(false)
+  const [abandoning, setAbandoning] = useState(false)
+  const [restEndsAt, setRestEndsAtState] = useState<number | null>(readRestEnd)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const setRestEndsAt = useCallback((value: number | null) => {
+    writeRestEnd(value)
+    setRestEndsAtState(value)
+  }, [])
+
+  const setsKey = ['session-sets', session.id]
+  const sets = useQuery({
+    queryKey: setsKey,
+    queryFn: async () =>
+      unwrap(
+        await supabase.from('session_sets').select('*').eq('session_id', session.id)
+          .order('exercise_position').order('set_number'),
+      ) as SessionSet[],
+  })
+
+  const exerciseIds = useMemo(
+    () => [...new Set((sets.data ?? []).map((s) => s.exercise_id))],
+    [sets.data],
+  )
+  const previous = useQuery({
+    queryKey: ['last-perf', session.athlete_id, exerciseIds],
+    enabled: exerciseIds.length > 0,
+    queryFn: () => lastPerformances(session.athlete_id, exerciseIds),
+  })
+
+  const groups = useMemo(() => {
+    const map = new Map<number, SessionSet[]>()
+    for (const s of sets.data ?? []) {
+      const list = map.get(s.exercise_position) ?? []
+      list.push(s)
+      map.set(s.exercise_position, list)
+    }
+    return [...map.entries()].sort((a, b) => a[0] - b[0])
+  }, [sets.data])
+
+  function patchLocal(id: string, patch: Partial<SessionSet>) {
+    queryClient.setQueryData<SessionSet[]>(setsKey, (old) => old?.map((s) => (s.id === id ? { ...s, ...patch } : s)))
+  }
+
+  async function updateSet(id: string, patch: Partial<SessionSet>) {
+    patchLocal(id, patch)
+    const { error } = await supabase.from('session_sets').update(patch).eq('id', id)
+    if (error) {
+      setError(error.message)
+      await sets.refetch()
+    }
+  }
+
+  async function toggleDone(set: SessionSet) {
+    const done = !set.done
+    await updateSet(set.id, { done, completed_at: done ? new Date().toISOString() : null })
+    if (done && set.rest_sec > 0) setRestEndsAt(Date.now() + set.rest_sec * 1000)
+  }
+
+  async function addSet(group: SessionSet[]) {
+    const last = group.at(-1)!
+    const { error } = await supabase.from('session_sets').insert({
+      session_id: session.id,
+      exercise_id: last.exercise_id,
+      equipment_id: last.equipment_id,
+      exercise_position: last.exercise_position,
+      set_number: last.set_number + 1,
+      reps: last.reps,
+      weight_kg: last.weight_kg,
+      rest_sec: last.rest_sec,
+    })
+    if (error) setError(error.message)
+    await sets.refetch()
+  }
+
+  async function removeSet(set: SessionSet) {
+    const { error } = await supabase.from('session_sets').delete().eq('id', set.id)
+    if (error) setError(error.message)
+    await sets.refetch()
+  }
+
+  async function addExercise(exercise: Exercise) {
+    setPicking(false)
+    const position = groups.length ? groups[groups.length - 1][0] + 1 : 0
+    const last = (await lastPerformances(session.athlete_id, [exercise.id])).get(exercise.id)
+    const { error } = await supabase.from('session_sets').insert({
+      session_id: session.id,
+      exercise_id: exercise.id,
+      exercise_position: position,
+      set_number: 1,
+      reps: last?.reps ?? 10,
+      weight_kg: last?.weight_kg ?? 0,
+      rest_sec: 90,
+    })
+    if (error) setError(error.message)
+    await sets.refetch()
+  }
+
+  async function finish(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const form = new FormData(e.currentTarget)
+    const rpe = Number(form.get('rpe'))
+    const notes = String(form.get('notes') ?? '').trim()
+    setError(null)
+    // Les séries non cochées ne sont pas conservées
+    const del = await supabase.from('session_sets').delete().eq('session_id', session.id).eq('done', false)
+    if (del.error) return setError(del.error.message)
+    const { error } = await supabase.from('sessions')
+      .update({ ended_at: new Date().toISOString(), rpe, notes: notes || null })
+      .eq('id', session.id)
+    if (error) return setError(error.message)
+    setRestEndsAt(null)
+    await queryClient.invalidateQueries()
+    navigate(`/historique/${session.id}`)
+  }
+
+  async function abandon() {
+    setAbandoning(false)
+    const { error } = await supabase.from('sessions').delete().eq('id', session.id)
+    if (error) return setError(error.message)
+    setRestEndsAt(null)
+    await queryClient.invalidateQueries({ queryKey: ACTIVE_SESSION_KEY })
+    navigate('/')
+  }
+
+  const doneCount = sets.data?.filter((s) => s.done).length ?? 0
+
+  return (
+    <div className="stack-lg session-runner">
+      <div>
+        <h1>{session.name}</h1>
+        <p className="muted">
+          {gym ? gym.name : 'Aucune salle précise'} · commencée il y a {formatDuration(Date.parse(session.started_at), now)} · {doneCount}/{sets.data?.length ?? 0} séries faites
+        </p>
+      </div>
+      <ErrorMessage error={error} />
+
+      {sets.isPending && <Loading />}
+      {groups.length === 0 && !sets.isPending && <Empty>Ajoute un premier exercice pour commencer.</Empty>}
+
+      {groups.map(([position, group]) => {
+        const exercise = exerciseMap.get(group[0].exercise_id)
+        const eq = group[0].equipment_id ? equipmentMap.get(group[0].equipment_id) : undefined
+        const prev = previous.data?.get(group[0].exercise_id)
+        const headingId = `ex-${position}`
+        return (
+          <section key={position} className="card exercise-block" aria-labelledby={headingId}>
+            <h2 id={headingId}>{exercise?.name ?? 'Exercice'}</h2>
+            <p className="muted small">
+              {eq && <>{eq.name}{eq.brand ? ` (${eq.brand})` : ''} · </>}
+              {prev ? `Dernière fois : ${formatKg(prev.weight_kg)} × ${prev.reps}` : 'Première fois sur cet exercice'}
+            </p>
+            <table className="sets-table">
+              <caption className="visually-hidden">Séries de {exercise?.name}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Série</th>
+                  <th scope="col">Charge (kg)</th>
+                  <th scope="col">Répétitions</th>
+                  <th scope="col">Faite</th>
+                  <th scope="col"><span className="visually-hidden">Supprimer</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.map((set) => (
+                  <SetRow key={set.id} set={set} exerciseName={exercise?.name ?? ''}
+                    onUpdate={(patch) => updateSet(set.id, patch)}
+                    onToggle={() => toggleDone(set)}
+                    onRemove={() => removeSet(set)} />
+                ))}
+              </tbody>
+            </table>
+            <button type="button" onClick={() => addSet(group)}>+ Ajouter une série</button>
+          </section>
+        )
+      })}
+
+      <div className="row wrap">
+        <button type="button" onClick={() => setPicking(true)}>+ Ajouter un exercice</button>
+        <button type="button" className="primary" onClick={() => setFinishing(true)}>Terminer la séance</button>
+        <button type="button" className="danger-link" onClick={() => setAbandoning(true)}>Abandonner</button>
+      </div>
+
+      <RestTimer endsAt={restEndsAt} onChange={setRestEndsAt} />
+
+      <Dialog open={picking} onClose={() => setPicking(false)} title="Ajouter un exercice">
+        <ExercisePicker gymId={session.gym_id} onPick={addExercise} />
+      </Dialog>
+
+      <Dialog open={finishing} onClose={() => setFinishing(false)} title="Terminer la séance">
+        <form onSubmit={finish} className="stack">
+          <RpeField />
+          <div className="field">
+            <label htmlFor="notes">Notes (facultatif)</label>
+            <textarea id="notes" name="notes" rows={3} />
+          </div>
+          {sets.data && doneCount < sets.data.length && (
+            <p className="hint">Les {sets.data.length - doneCount} séries non cochées ne seront pas enregistrées.</p>
+          )}
+          <button type="submit" className="primary" autoFocus>Enregistrer la séance</button>
+        </form>
+      </Dialog>
+
+      <ConfirmDialog open={abandoning} title="Abandonner la séance ?"
+        message="La séance en cours et toutes ses séries seront supprimées."
+        confirmLabel="Abandonner" onConfirm={abandon} onCancel={() => setAbandoning(false)} />
+    </div>
+  )
+}
+
+function RpeField() {
+  const [value, setValue] = useState(7)
+  return (
+    <div className="field">
+      <label htmlFor="rpe">Intensité ressentie (RPE) : <output htmlFor="rpe">{value}/10</output></label>
+      <input id="rpe" name="rpe" type="range" min={1} max={10} step={1} value={value}
+        onChange={(e) => setValue(Number(e.target.value))} aria-describedby="rpe-help" />
+      <span id="rpe-help" className="hint">1 = très facile, 10 = effort maximal.</span>
+    </div>
+  )
+}
+
+interface SetRowProps {
+  set: SessionSet
+  exerciseName: string
+  onUpdate: (patch: Partial<SessionSet>) => void
+  onToggle: () => void
+  onRemove: () => void
+}
+
+function SetRow({ set, exerciseName, onUpdate, onToggle, onRemove }: SetRowProps) {
+  // État local pour que la case réagisse immédiatement, avant la réponse du serveur
+  const [done, setDone] = useState(set.done)
+  const [syncedDone, setSyncedDone] = useState(set.done)
+  if (set.done !== syncedDone) {
+    setSyncedDone(set.done)
+    setDone(set.done)
+  }
+  const label = `${exerciseName}, série ${set.set_number}`
+  function commitWeight(input: HTMLInputElement) {
+    const value = parseDecimal(input.value)
+    if (value === null || value > 1000) {
+      input.setCustomValidity('Saisis une charge valide, par exemple 62,5')
+      input.reportValidity()
+      return
+    }
+    input.setCustomValidity('')
+    if (value !== Number(set.weight_kg)) onUpdate({ weight_kg: value })
+  }
+  function commitReps(input: HTMLInputElement) {
+    const value = Number(input.value)
+    if (!Number.isInteger(value) || value < 0 || value > 1000) {
+      input.setCustomValidity('Saisis un nombre entier de répétitions')
+      input.reportValidity()
+      return
+    }
+    input.setCustomValidity('')
+    if (value !== set.reps) onUpdate({ reps: value })
+  }
+  return (
+    <tr className={done ? 'done' : undefined}>
+      <th scope="row">{set.set_number}</th>
+      <td>
+        <input type="text" inputMode="decimal" enterKeyHint="next" aria-label={`Charge, ${label}`}
+          defaultValue={String(Number(set.weight_kg)).replace('.', ',')}
+          onInput={(e) => e.currentTarget.setCustomValidity('')}
+          onBlur={(e) => commitWeight(e.currentTarget)} />
+      </td>
+      <td>
+        <input type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="done" aria-label={`Répétitions, ${label}`}
+          defaultValue={set.reps}
+          onInput={(e) => e.currentTarget.setCustomValidity('')}
+          onBlur={(e) => commitReps(e.currentTarget)} />
+      </td>
+      <td>
+        <label className="check">
+          <input type="checkbox" checked={done} onChange={() => { setDone(!done); onToggle() }} />
+          <span className="visually-hidden">Série faite, {label}</span>
+        </label>
+      </td>
+      <td>
+        <button type="button" className="icon-button" onClick={onRemove} aria-label={`Supprimer ${label}`}>
+          <span aria-hidden="true">✕</span>
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+function ExercisePicker({ gymId, onPick }: { gymId: string | null; onPick: (e: Exercise) => void }) {
+  const available = useGymExercises(gymId)
+  const [query, setQuery] = useState('')
+  const normalized = query.trim().toLocaleLowerCase('fr')
+  const list = (available.data ?? []).filter(
+    (e) => !normalized || e.name.toLocaleLowerCase('fr').includes(normalized) || MUSCLE_LABELS[e.muscle_group].toLocaleLowerCase('fr').includes(normalized),
+  )
+  return (
+    <div className="stack">
+      <search>
+        <label htmlFor="ex-search">Rechercher un exercice ou un muscle</label>
+        <input id="ex-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+          autoComplete="off" autoCorrect="off" spellCheck={false} autoFocus />
+      </search>
+      {gymId && <p className="hint">Seuls les exercices disponibles dans cette salle sont listés.</p>}
+      {available.isPending && <Loading />}
+      <ul className="plain-list picker-list">
+        {list.map((e) => (
+          <li key={e.id}>
+            <button type="button" onClick={() => onPick(e)}>
+              <strong>{e.name}</strong>
+              <span className="muted small">{MUSCLE_LABELS[e.muscle_group]}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {!available.isPending && list.length === 0 && <Empty>Aucun exercice ne correspond.</Empty>}
+    </div>
+  )
+}
