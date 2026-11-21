@@ -196,7 +196,7 @@ function SessionRunner({ session }: { session: Session }) {
       {sets.isPending && <Loading />}
       {groups.length === 0 && !sets.isPending && <Empty>Ajoute un premier exercice pour commencer.</Empty>}
 
-      {groups.map(([position, group]) => {
+      {groups.map(([position, group], index) => {
         const exercise = exerciseMap.get(group[0].exercise_id)
         const eq = group[0].equipment_id ? equipmentMap.get(group[0].equipment_id) : undefined
         const prev = previous.data?.get(group[0].exercise_id)
@@ -204,7 +204,7 @@ function SessionRunner({ session }: { session: Session }) {
         const headingId = `ex-${position}`
         return (
           <section key={position} className="card exercise-block" aria-labelledby={headingId}>
-            <h2 id={headingId}>{exercise?.name ?? 'Exercice'}</h2>
+            <h2 id={headingId}><span className="station" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>{exercise?.name ?? 'Exercice'}</h2>
             <p className="muted small exercise-meta">
               {eq && <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>}
               <span>{prev ? `Dernière fois : ${formatKg(prev.weight_kg)} × ${prev.reps}` : 'Première fois sur cet exercice'}</span>

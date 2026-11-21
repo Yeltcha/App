@@ -38,8 +38,8 @@
   --surface-raised: var(--beton);
 
   /* Typographie : Big Shoulders (signalétique industrielle) pour les titres et les chiffres,
-     sa version pochoir pour la marque, Archivo pour le texte */
-  --font: 'Archivo Variable', 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+     sa version pochoir pour la marque, Familjen Grotesk pour le texte */
+  --font: 'Familjen Grotesk Variable', 'Familjen Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --display: 'Big Shoulders Variable', 'Arial Narrow', var(--font);
   --stencil: 'Big Shoulders Stencil Variable', var(--display);
   --step--1: 0.875rem;  /* 14 */
@@ -51,9 +51,9 @@
   --step-5: 4.5rem;     /* 72 */
 
   /* Rayons selon le niveau */
-  --r-panel: 20px;
-  --r-row: 12px;
-  --r-field: 10px;
+  --r-panel: 0;
+  --r-row: 0;
+  --r-field: 0;
 
   --target-size: 24px;
   --tab-bar-height: 4.25rem;
@@ -183,7 +183,7 @@ button, .button {
   gap: 0.4rem;
   padding: 0.5rem 1.1rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--control);
   color: var(--text);
   font-weight: 600;
@@ -254,7 +254,7 @@ legend { font-weight: 600; padding-inline: 0.25rem; }
 .segmented legend { padding: 0 0 0.35rem; font-size: var(--step--1); color: var(--text-muted); }
 .segmented label {
   display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.35rem 0.95rem; border-radius: 999px; background: var(--control);
+  padding: 0.35rem 0.95rem; border-radius: 0; background: var(--control);
   min-block-size: max(var(--target-size), 2.5rem); cursor: pointer; font-weight: 600;
 }
 .segmented input { position: absolute; opacity: 0; pointer-events: none; }
@@ -298,7 +298,7 @@ legend { font-weight: 600; padding-inline: 0.25rem; }
 .staff-nav { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .staff-nav a {
   display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.3rem 0.8rem; border-radius: 999px; min-block-size: max(var(--target-size), 2.25rem);
+  padding: 0.3rem 0.8rem; border-radius: 0; min-block-size: max(var(--target-size), 2.25rem);
   color: var(--text-muted); text-decoration: none; font-size: var(--step--1); font-weight: 600;
 }
 .staff-nav a:hover { color: var(--text); background: var(--surface); }
@@ -387,7 +387,7 @@ article.card { border-radius: var(--r-row); }
 .error { color: var(--danger); font-weight: 600; }
 .success { color: var(--brand); font-weight: 600; }
 .success:empty { display: none; }
-.badge { display: inline-block; padding: 0.05rem 0.55rem; border-radius: 999px; background: var(--control); font-size: 0.8rem; font-weight: 600; }
+.badge { display: inline-block; padding: 0.05rem 0.55rem; border-radius: 0; background: var(--control); font-size: 0.8rem; font-weight: 600; }
 .notes { white-space: pre-line; font-style: italic; }
 
 details > summary {
@@ -498,13 +498,13 @@ dialog::backdrop {
   inline-size: 100%;
   block-size: 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--surface);
   overflow: hidden;
 }
-.session-progress progress::-webkit-progress-bar { background: var(--surface); border-radius: 999px; }
-.session-progress progress::-webkit-progress-value { background: var(--brand); border-radius: 999px; }
-.session-progress progress::-moz-progress-bar { background: var(--brand); border-radius: 999px; }
+.session-progress progress::-webkit-progress-bar { background: var(--surface); border-radius: 0; }
+.session-progress progress::-webkit-progress-value { background: var(--brand); border-radius: 0; }
+.session-progress progress::-moz-progress-bar { background: var(--brand); border-radius: 0; }
 .session-progress output { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .exercise-block { display: grid; gap: 0.6rem; padding: 1.1rem 0.75rem 0.9rem; }
@@ -653,11 +653,11 @@ dialog::backdrop {
 .featured .lead { font-size: var(--step-4); }
 progress { inline-size: 100%; accent-color: var(--series-1); }
 .featured progress {
-  appearance: none; block-size: 6px; border: 0; border-radius: 999px; background: var(--bg); overflow: hidden;
+  appearance: none; block-size: 6px; border: 0; border-radius: 0; background: var(--bg); overflow: hidden;
 }
-.featured progress::-webkit-progress-bar { background: var(--bg); border-radius: 999px; }
-.featured progress::-webkit-progress-value { background: var(--series-1); border-radius: 999px; }
-.featured progress::-moz-progress-bar { background: var(--series-1); border-radius: 999px; }
+.featured progress::-webkit-progress-bar { background: var(--bg); border-radius: 0; }
+.featured progress::-webkit-progress-value { background: var(--series-1); border-radius: 0; }
+.featured progress::-moz-progress-bar { background: var(--series-1); border-radius: 0; }
 
 .chart { margin: 0; display: grid; gap: 0.5rem; }
 .chart figcaption { font-weight: 600; color: var(--text-muted); font-size: var(--step--1); }
@@ -704,3 +704,143 @@ progress { inline-size: 100%; accent-color: var(--series-1); }
 .set-track li { flex: 1 1 0; max-inline-size: 3rem; block-size: 10px; border-radius: 2px; background: var(--surface); transition: background-color 160ms ease-out; }
 .set-track li.done { background: var(--brand); }
 .session-progress output { font-family: var(--display); font-size: var(--step-1); }
+
+/* ==========================================================================
+   Passe 5 : langage de formes du hangar
+   - Angles vifs et coin coupé (comme une plaque d'acier découpée)
+   - Boutons en capitales Big Shoulders, façon marquage
+   - Champs soulignés, cases carrées, onglets à barre pleine
+   ========================================================================== */
+:root {
+  --ch: 14px;      /* coin coupé des panneaux */
+  --ch-sm: 9px;    /* coin coupé des boutons */
+}
+
+/* Coin coupé en haut à droite, sans clip-path pour garder le contour de focus */
+.card, .session-row, .kpis, dialog, .rest-bar, .empty {
+  --tile: var(--surface);
+  border-radius: 0;
+  background: linear-gradient(225deg, transparent var(--ch), var(--tile) 0);
+}
+.empty { --tile: color-mix(in oklab, var(--surface) 55%, transparent); }
+.session-row:hover { --tile: var(--control); background: linear-gradient(225deg, transparent var(--ch), var(--tile) 0); }
+.rest-bar { --tile: var(--brand); border-radius: 0; }
+
+/* Boutons */
+button, .button {
+  --tile: var(--control);
+  border-radius: 0;
+  background: linear-gradient(225deg, transparent var(--ch-sm), var(--tile) 0);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-inline: 1.25rem;
+}
+button:hover:not(:disabled), .button:hover { --tile: #3a3b3f; background: linear-gradient(225deg, transparent var(--ch-sm), var(--tile) 0); }
+button.primary, .button.primary { --tile: var(--brand); color: var(--on-brand); font-weight: 850; }
+button.primary:hover:not(:disabled), .button.primary:hover { --tile: #ffffff; background: linear-gradient(225deg, transparent var(--ch-sm), var(--tile) 0); filter: none; }
+button.danger { --tile: var(--danger); background: linear-gradient(225deg, transparent var(--ch-sm), var(--tile) 0); }
+.cta { min-block-size: 3.5rem; font-size: 1.35rem; }
+
+/* Liens d'action et petits boutons : texte, pas de pavé */
+button.link, button.danger-link, .icon-button, .add-set {
+  background: none;
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font);
+  font-size: 1rem;
+}
+button.link:hover, button.danger-link:hover, .icon-button:hover:not(:disabled), .add-set:hover:not(:disabled) { background: none; color: var(--text); }
+.add-set { font-weight: 700; padding-inline: 0.35rem; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.2em; }
+.rest-bar button { --tile: rgb(16 17 18 / 0.1); background: linear-gradient(225deg, transparent var(--ch-sm), var(--tile) 0); font-size: 1rem; }
+.rest-bar button:hover:not(:disabled) { --tile: rgb(16 17 18 / 0.2); background: linear-gradient(225deg, transparent var(--ch-sm), var(--tile) 0); }
+.picker-list button { --tile: var(--bg); text-transform: none; letter-spacing: 0; font-family: var(--font); font-size: 1rem; font-weight: 600; }
+.picker-list button:hover:not(:disabled) { --tile: var(--control); }
+button[aria-pressed='true'] { --tile: var(--done-bg); box-shadow: inset 0 -3px 0 var(--brand); }
+
+/* Champs : fond creusé, trait de soulignement */
+input:not([type='checkbox'], [type='radio'], [type='range']), select, textarea {
+  border: 0;
+  border-block-end: 2px solid var(--field-border);
+  border-radius: 0;
+  background-color: var(--bg);
+}
+input:not([type='checkbox'], [type='radio'], [type='range']):focus, select:focus, textarea:focus { outline: 0; border-block-end-color: var(--brand); box-shadow: inset 0 -1px 0 var(--brand); }
+input:user-invalid, select:user-invalid, textarea:user-invalid { border-block-end-color: var(--danger); }
+.card input:not([type='checkbox'], [type='radio'], [type='range']), .card select, .card textarea, dialog input:not([type='checkbox'], [type='radio'], [type='range']), dialog select, dialog textarea { background-color: var(--bg); }
+.field > label, search > label { font-family: var(--display); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.04em; text-transform: uppercase; }
+
+/* Lignes de série : bandes pleines, numéro au pochoir */
+.sets-table { border-spacing: 0 3px; }
+.sets-table tbody th { font-family: var(--stencil); font-size: 1.5rem; }
+.sets-table input[type='text'] { border-block-end: 2px solid transparent; }
+.sets-table input[type='text']:hover { border-block-end-color: var(--field-border); }
+.sets-table input[type='text']:focus { box-shadow: none; border-block-end-color: var(--brand); }
+.sets-table thead th { font-family: var(--display); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.sets-table tr.done > * { background: var(--done-bg); }
+.sets-table tr.done th { color: var(--text); box-shadow: inset 4px 0 0 var(--brand); }
+
+.check input[type='checkbox'] { border-radius: 0; border-width: 2px; }
+
+/* Numéro de poste : l'ordre des exercices est une vraie séquence */
+.station {
+  display: inline-block;
+  min-inline-size: 2ch;
+  margin-inline-end: 0.5rem;
+  font-family: var(--stencil);
+  font-weight: 900;
+  color: var(--text-muted);
+}
+
+/* Bande moletée en tête de la séance du jour : la prise de la barre */
+.today { position: relative; padding-block-start: 1.75rem; }
+.today::before {
+  content: '';
+  position: absolute;
+  inset: 0 var(--ch) auto 0;
+  block-size: 8px;
+  background:
+    repeating-linear-gradient(45deg, rgb(242 242 239 / 0.18) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-45deg, rgb(242 242 239 / 0.18) 0 1px, transparent 1px 5px);
+}
+.today.live { box-shadow: none; }
+.today.live::before { background:
+    repeating-linear-gradient(45deg, var(--brand) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-45deg, var(--brand) 0 1px, transparent 1px 5px); }
+.today-label, .chart figcaption, .kpi dt, .fact span, .session-facts dt {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.today-label { font-size: 1rem; text-transform: uppercase; }
+
+/* Sélecteur segmenté : onglets rectangulaires */
+.segmented { gap: 0; }
+.segmented label {
+  border-radius: 0;
+  background: var(--bg);
+  border-block-end: 3px solid var(--control);
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.segmented label:has(:checked) { background: var(--bg); color: var(--text); border-block-end-color: var(--brand); }
+
+/* Barre d'onglets : barre pleine sur l'onglet actif, libellés en capitales */
+.tab-bar { border-block-start: 1px solid var(--line); }
+.tab-bar a { font-family: var(--display); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.tab-bar a[aria-current='page']::before { inset-inline: 0; inline-size: auto; block-size: 3px; border-radius: 0; }
+@media (min-width: 60rem) { .tab-bar { border-radius: 0; } }
+
+.staff-nav a { border-radius: 0; font-family: var(--display); font-weight: 700; font-size: 1rem; letter-spacing: 0.05em; text-transform: uppercase; }
+.staff-nav a[aria-current='page'] { background: none; box-shadow: inset 0 -3px 0 var(--brand); }
+.staff-nav a:hover { background: none; }
+
+.badge { border-radius: 0; font-family: var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+.set-track li { border-radius: 0; }
+.featured progress, .featured progress::-webkit-progress-bar, .featured progress::-webkit-progress-value, .featured progress::-moz-progress-bar { border-radius: 0; }
+/* Les unités restent en minuscules (s, kg) */
+.rest-bar button { text-transform: none; letter-spacing: 0.02em; }
