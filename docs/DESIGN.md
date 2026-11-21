@@ -10,18 +10,18 @@ Notes de design tenues à jour à chaque passe, pour ne pas refaire deux fois la
 
 ## Palette
 
-La couleur de fond et l’accent secondaire sont imposés par le brief (Pantone 19-6110 TCX « Deep Forest », puis la même teinte plus claire).
+Passe 3 : Youri a demandé un fond plus foncé et neutre, et une surbrillance neutre elle aussi. Le vert Deep Forest et le volt sont abandonnés.
 
 | Nom | Hex | Rôle |
 | --- | --- | --- |
-| Sous-bois | `#37413A` | Fond principal (Pantone 19-6110 TCX) |
-| Feuillage | `#455249` | Accent secondaire : panneaux, barre d’onglets |
-| Mousse | `#56655A` | Contrôles secondaires, état survolé |
-| Craie | `#EEF1EA` | Texte principal (la magnésie sur les mains) |
-| Lichen | `#C3CEC6` | Texte secondaire (5,1:1 sur Feuillage) |
-| Volt | `#C8F53C` | Action et réussite uniquement |
+| Graphite | `#141516` | Fond principal |
+| Ardoise | `#1F2022` | Panneaux, barre d’onglets |
+| Acier | `#2C2D30` | Contrôles secondaires |
+| Blanc | `#F2F2F0` | Texte principal |
+| Cendre | `#A4A7AB` | Texte secondaire (6,8:1 sur Ardoise) |
+| Surbrillance | `#E6E6E3` | Action et réussite : bouton principal, série faite, minuteur |
 
-Bordures de champs `#95A499` (3,1:1 sur Feuillage). Erreur `#FFB3A6`.
+Bordures de champs `#6C6F74` (3,2:1 sur Ardoise). Série faite `#3A3B3D`. Erreur `#FF9D8C`.
 
 ## Typographie
 
@@ -58,8 +58,8 @@ Accueil                         Séance en cours
 ## Principes
 
 1. **Les chiffres sont le héros.** Charges, répétitions et repos s’affichent grands, étroits, tabulaires. C’est l’endroit où le design ose.
-2. **Le volt veut dire « agir » ou « fait ».** Bouton principal, série validée, minuteur, onglet actif. Jamais en décoration (ni le logo, ni les indicateurs).
-3. **La hiérarchie vient du ton, pas des cadres.** Fond, panneau, contrôle : trois tons de vert. Pas d’ombre, sauf le minuteur qui flotte. Rayons différents selon le niveau (panneau 20 px, ligne 12 px, champ 10 px, bouton en pilule).
+2. **La surbrillance veut dire « agir » ou « fait ».** Bouton principal, série validée, minuteur, onglet actif. Jamais en décoration.
+3. **La hiérarchie vient du ton, pas des cadres.** Fond, panneau, contrôle : trois tons de gris. Pas d’ombre, sauf le minuteur qui flotte. Rayons différents selon le niveau (panneau 20 px, ligne 12 px, champ 10 px, bouton en pilule).
 4. **Pas de chaînes « A · B · C ».** Les métadonnées sont posées en colonnes ou en lignes séparées.
 5. **Mouvement seulement en réponse à un geste** : validation d’une série, ouverture d’une boîte de dialogue. Respect de `prefers-reduced-motion`.
 
@@ -72,4 +72,5 @@ Accueil                         Séance en cours
 ## Historique des passes
 
 - **Passe 1 (palette)** : Deep Forest + volt, police système, cartes bordées partout.
-- **Passe 2 (cette refonte)** : Archivo, chiffres étroits, volt réservé à l’action, panneaux tonaux, lignes de série en grand format, minuteur avec jauge.
+- **Passe 2** : Archivo, chiffres étroits, volt réservé à l’action, panneaux tonaux, lignes de série en grand format, minuteur avec jauge.
+- **Passe 3** : palette graphite neutre et surbrillance blanc cassé, à la demande de Youri (le vert ne lui convenait pas). Typographie et mise en page inchangées.
