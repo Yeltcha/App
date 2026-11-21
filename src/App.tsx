@@ -41,7 +41,10 @@ export function App() {
   return (
     <div className="shell">
       <header className="top-bar">
-        <a href="/" className="brand">Muscu</a>
+        <a href="/" className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          Praug
+        </a>
         {isStaff && (
           <nav aria-label="Espace coach" className="staff-nav">
             {STAFF_NAV.map((item) => (

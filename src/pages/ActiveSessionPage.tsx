@@ -11,6 +11,8 @@ import { formatDuration } from '../lib/dates'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
 import { RestTimer } from '../components/RestTimer'
+import { BarLoad } from '../components/BarLoad'
+import { isBarbellExercise } from '../lib/plates'
 import { readRestEnd, writeRestEnd } from '../lib/restStorage'
 
 export default function ActiveSessionPage() {
@@ -183,8 +185,10 @@ function SessionRunner({ session }: { session: Session }) {
           <span>Commencée il y a {formatDuration(Date.parse(session.started_at), now)}</span>
         </p>
         <div className="session-progress">
-          <progress id="session-progress" max={Math.max(1, total)} value={doneCount} aria-label="Séries faites" />
-          <output htmlFor="session-progress">{doneCount} sur {total} séries</output>
+          <ol className="set-track" aria-hidden="true">
+            {(sets.data ?? []).map((s) => <li key={s.id} className={s.done ? 'done' : undefined} />)}
+          </ol>
+          <output aria-live="polite">{doneCount} sur {total} séries</output>
         </div>
       </header>
       <ErrorMessage error={error} />
@@ -196,6 +200,7 @@ function SessionRunner({ session }: { session: Session }) {
         const exercise = exerciseMap.get(group[0].exercise_id)
         const eq = group[0].equipment_id ? equipmentMap.get(group[0].equipment_id) : undefined
         const prev = previous.data?.get(group[0].exercise_id)
+        const nextSet = group.find((s) => !s.done) ?? group.at(-1)!
         const headingId = `ex-${position}`
         return (
           <section key={position} className="card exercise-block" aria-labelledby={headingId}>
@@ -204,6 +209,7 @@ function SessionRunner({ session }: { session: Session }) {
               {eq && <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>}
               <span>{prev ? `Dernière fois : ${formatKg(prev.weight_kg)} × ${prev.reps}` : 'Première fois sur cet exercice'}</span>
             </p>
+            {isBarbellExercise(exercise?.name) && <BarLoad weightKg={Number(nextSet.weight_kg)} />}
             <table className="sets-table">
               <caption className="visually-hidden">Séries de {exercise?.name}</caption>
               <thead>

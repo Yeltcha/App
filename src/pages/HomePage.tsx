@@ -9,6 +9,8 @@ import type { Program, SessionSummary, Workout, WorkoutExercise } from '../lib/t
 import { Dialog } from '../components/Dialog'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
 import { SessionRow } from '../components/SessionRow'
+import { BarLoad } from '../components/BarLoad'
+import { isBarbellExercise } from '../lib/plates'
 import { formatNumber } from '../lib/numbers'
 
 const LAST_GYM_KEY = 'muscu:last-gym'
@@ -109,15 +111,19 @@ export function HomePage() {
           </div>
           {plan.data && plan.data.length > 0 && (
             <ul className="plan-list" aria-label={`Exercices de ${next.data.name}`}>
-              {plan.data.map((item) => (
+              {plan.data.map((item) => {
+                const name = exerciseMap.get(item.exercise_id)?.name
+                return (
                 <li key={item.id}>
-                  <span>{exerciseMap.get(item.exercise_id)?.name ?? 'Exercice'}</span>
+                  <span>{name ?? 'Exercice'}</span>
                   <span className="figure">
                     {item.target_sets} × {item.rep_max ? `${item.rep_min}–${item.rep_max}` : item.rep_min}
                     {item.target_weight_kg ? ` @ ${formatNumber(Number(item.target_weight_kg))} kg` : null}
                   </span>
+                  {item.target_weight_kg && isBarbellExercise(name) ? <BarLoad weightKg={Number(item.target_weight_kg)} /> : null}
                 </li>
-              ))}
+                )
+              })}
             </ul>
           )}
           <button type="button" className="primary cta" onClick={() => setStartFor(next.data)}>

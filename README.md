@@ -1,4 +1,4 @@
-# Muscu : suivi d'entraînement coach / athlètes
+# Praug : programmation et suivi d'entraînement coach / athlètes
 
 Application web (PWA installable sur téléphone) pour construire des programmes de musculation, suivre les séances en direct et visualiser la progression.
 
