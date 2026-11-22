@@ -2,13 +2,13 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, unwrap } from '../lib/supabase'
-import { byId, useEquipment, useExerciseEquipment, useGymExercises, useGyms, useProfiles } from '../lib/queries'
+import { byId, useEquipment, useExerciseEquipment, useExercises, useGymExercises, useGyms, useProfiles } from '../lib/queries'
 import { SPECIALTY_LABELS, type Program, type Specialty, type Workout, type WorkoutExercise } from '../lib/types'
 import { formatKg, formatNumber, parseDecimal } from '../lib/numbers'
 import { plannedRpeLoad, referenceMaxes, type ReferenceMax } from '../lib/oneRepMax'
 import { formatRpe, RPE_VALUES, rirFor } from '../lib/rpe'
 import { formatShortDate } from '../lib/dates'
-import { brandsOf, machinesFor } from '../lib/machines'
+import { exerciseChoices } from '../lib/machines'
 import { describeSet, plannedSetLoad, plannedSets, rampRpe, SET_KIND_LABELS, SET_KINDS, type PlannedSet, type SetKind } from '../lib/setPlan'
 import { RpeTable } from '../components/RpeTable'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
@@ -214,9 +214,9 @@ export default function ProgramEditPage() {
             <input id="w_name" name="w_name" required autoFocus placeholder="Push" />
           </div>
           <div className="field">
-            <label htmlFor="w_gym">Salle (facultatif)</label>
+            <label htmlFor="w_gym">Salle de la séance</label>
             <select id="w_gym" name="w_gym" defaultValue="">
-              <option value="">Toutes les salles</option>
+              <option value="">Aucune salle (sans machine)</option>
               {gyms.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
@@ -266,7 +266,7 @@ function WorkoutGymField({ workout, gyms, onSaved }: { workout: Workout; gyms: {
           await supabase.from('workouts').update({ gym_id: e.target.value || null }).eq('id', workout.id)
           onSaved()
         }}>
-        <option value="">Toutes les salles</option>
+        <option value="">Aucune salle (sans machine)</option>
         {gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
       </select>
     </div>
@@ -281,7 +281,7 @@ function PlanRow({ item, index, count, max, onEdit, onMove, onDelete }: {
   const equipment = byId(useEquipment().data)
   const name = exercises.get(item.exercise_id)?.name ?? 'Exercice'
   const machine = item.equipment_id ? equipment.get(item.equipment_id) : undefined
-  const machineText = machine ? `${machine.name}${machine.brand ? ` (${machine.brand})` : ''}` : item.equipment_brand ?? ''
+  const machineText = machine ? `${machine.name}${machine.brand ? ` (${machine.brand})` : ''}` : ''
   const sets = plannedSets(item)
   const varied = item.set_plan !== null
   const first = sets[0]
@@ -335,10 +335,13 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
   maxes: Map<string, ReferenceMax> | undefined
   onDone: () => void
 }) {
-  const exercises = useGymExercises(workout.gym_id)
+  const exercises = useExercises()
   const equipment = useEquipment()
   const links = useExerciseEquipment()
-  const [exerciseId, setExerciseId] = useState(item?.exercise_id ?? '')
+  const gyms = useGyms()
+  // Choix = exercice + machine éventuelle, encodé « exerciceId|machineId »
+  const [choice, setChoice] = useState(item ? `${item.exercise_id}|${item.equipment_id ?? ''}` : '')
+  const [exerciseId, equipmentId] = choice ? choice.split('|') : ['', '']
   const [specialty, setSpecialty] = useState<Specialty>(item?.specialty ?? 'bodybuilding')
   const [setCount, setSetCount] = useState(String(item?.target_sets ?? 3))
   const [repMin, setRepMin] = useState(String(item?.rep_min ?? 8))
@@ -353,18 +356,13 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
   const max = maxes?.get(exerciseId)
   const rpeLoad = targetRpe !== null ? plannedRpeLoad({ specialty, target_rpe: targetRpe, rep_min: Number(repMin) }, max) : null
 
-  const gyms = useGyms()
-  const [brand, setBrand] = useState(item?.equipment_brand ?? '')
-  const [equipmentId, setEquipmentId] = useState(item?.equipment_id ?? '')
-  const allEquipment = equipment.data ?? []
-  const allLinks = links.data ?? []
-  const exercise = exercises.data?.find((x) => x.id === exerciseId)
-  // Machines de l'exercice dans la salle de la séance (toutes les salles si elle n'en a pas)
-  const inGym = machinesFor(exerciseId, allEquipment, allLinks, { gymId: workout.gym_id })
-  const machineOptions = machinesFor(exerciseId, allEquipment, allLinks, { gymId: workout.gym_id, brand })
-  const showMachine = Boolean(exerciseId) && (exercise?.requires_equipment || inGym.length > 0
-    || machinesFor(exerciseId, allEquipment, allLinks).length > 0 || Boolean(brand))
-  const gymName = (id: string) => gyms.data?.find((g) => g.id === id)?.name ?? ''
+  const allExercises = exercises.data ?? []
+  const choices = exerciseChoices(allExercises, equipment.data ?? [], links.data ?? [], workout.gym_id)
+  const gymName = workout.gym_id ? gyms.data?.find((g) => g.id === workout.gym_id)?.name ?? '' : ''
+  const choiceKeys = new Set([...choices.free.map((x) => `${x.id}|`), ...choices.brands.flatMap((g) => g.items.map((i) => `${i.exercise.id}|${i.machine.id}`))])
+  // L'exercice déjà programmé reste proposé même s'il n'est plus dans la liste (salle changée…)
+  const current = item && !choiceKeys.has(choice) ? allExercises.find((x) => x.id === item.exercise_id) : undefined
+  const currentMachine = current && item?.equipment_id ? equipment.data?.find((eq) => eq.id === item.equipment_id) : undefined
 
   const commonRow = (): RowState => ({ kind: 'normal', repMin, repMax, rpe, weight: weightText })
 
@@ -427,9 +425,8 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
     }
     const values = {
       workout_id: workout.id,
-      exercise_id: String(f.get('exercise')),
-      equipment_id: showMachine && equipmentId ? equipmentId : null,
-      equipment_brand: showMachine ? brand.trim() || null : null,
+      exercise_id: exerciseId,
+      equipment_id: equipmentId || null,
       specialty,
       target_sets: plan ? plan.length : Number(setCount),
       rep_min: first.rep_min,
@@ -451,55 +448,30 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
     <form onSubmit={onSubmit} className="stack">
       <div className="field">
         <label htmlFor="pf-ex">Exercice</label>
-        <select id="pf-ex" name="exercise" required value={exerciseId} onChange={(e) => setExerciseId(e.target.value)} autoFocus>
+        <select id="pf-ex" name="exercise" required value={choice} onChange={(e) => setChoice(e.target.value)} autoFocus>
           <option value="" disabled>Choisir…</option>
-          {exercises.data?.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-        </select>
-        {workout.gym_id && <span className="hint">Liste limitée aux exercices disponibles dans la salle de cette séance.</span>}
-      </div>
-      {showMachine && (
-        <fieldset className="stack-sm equipment-fields">
-          <legend>Équipement</legend>
-          <p className="hint">
-            Salle : {workout.gym_id ? gymName(workout.gym_id) : 'toutes les salles'} (elle se règle sur la séance).
-            Indique une marque, une machine précise, ou les deux.
-          </p>
-          <div className="grid-2">
-            <div className="field">
-              <label htmlFor="pf-brand">Marque (facultatif)</label>
-              <input id="pf-brand" list="pf-brands" value={brand} autoComplete="off" maxLength={60}
-                onChange={(e) => {
-                  const value = e.target.value
-                  setBrand(value)
-                  const current = allEquipment.find((eq) => eq.id === equipmentId)
-                  if (current && value.trim() && current.brand?.toLocaleLowerCase('fr') !== value.trim().toLocaleLowerCase('fr')) setEquipmentId('')
-                }} />
-              <datalist id="pf-brands">
-                {brandsOf(inGym.length ? inGym : allEquipment).map((b) => <option key={b} value={b} />)}
-              </datalist>
-            </div>
-            <div className="field">
-              <label htmlFor="pf-eq">Machine</label>
-              <select id="pf-eq" value={equipmentId}
-                onChange={(e) => {
-                  setEquipmentId(e.target.value)
-                  const picked = allEquipment.find((eq) => eq.id === e.target.value)
-                  if (picked?.brand) setBrand(picked.brand)
-                }}>
-                <option value="">Indifférente</option>
-                {machineOptions.map((eq) => (
-                  <option key={eq.id} value={eq.id}>
-                    {eq.name}{eq.brand ? ` (${eq.brand})` : ''}{workout.gym_id ? '' : ` · ${gymName(eq.gym_id)}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {brand.trim() && machineOptions.length === 0 && (
-            <p className="hint">Aucune machine {brand.trim()} enregistrée pour cet exercice{workout.gym_id ? ' dans cette salle' : ''} : la marque sera indiquée à l’athlète.</p>
+          {current && (
+            <option value={choice}>{[current.name, currentMachine?.name, currentMachine?.brand].filter(Boolean).join(' · ')} (actuel)</option>
           )}
-        </fieldset>
-      )}
+          <optgroup label="Sans machine">
+            {choices.free.map((x) => <option key={x.id} value={`${x.id}|`}>{x.name}</option>)}
+          </optgroup>
+          {choices.brands.map((group) => (
+            <optgroup key={group.brand} label={group.brand}>
+              {group.items.map(({ exercise, machine }) => (
+                <option key={`${exercise.id}|${machine.id}`} value={`${exercise.id}|${machine.id}`}>
+                  {[exercise.name, machine.name !== exercise.name ? machine.name : null, machine.brand].filter(Boolean).join(' · ')}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <span className="hint">
+          {workout.gym_id
+            ? `Salle de la séance : ${gymName}. Exercices sans machine, puis ceux des machines de la salle, par marque.`
+            : 'Aucune salle choisie pour cette séance : seuls les exercices sans machine sont proposés. Choisis la salle sur la séance pour voir ses machines.'}
+        </span>
+      </div>
       <fieldset className="segmented">
         <legend>Spécialité</legend>
         {SPECIALTIES.map((sp) => (

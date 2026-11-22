@@ -72,8 +72,7 @@ export default function SessionDetailPage() {
         return (
           <section key={pos} className="card" aria-labelledby={`d-${pos}`}>
             <h2 id={`d-${pos}`}>{ex?.name}</h2>
-            {eq ? <p className="muted small">{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</p>
-              : group[0].equipment_brand && <p className="muted small">Marque : {group[0].equipment_brand}</p>}
+            {eq && <p className="muted small">{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</p>}
             <ol className="set-summary">
               {group.map((s) => (
                 <li key={s.id}>
