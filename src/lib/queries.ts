@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase, unwrap } from './supabase'
-import type { Equipment, Exercise, Gym, Profile } from './types'
+import type { Equipment, Exercise, Gym, GymBrand, Profile } from './types'
 
 export function useExercises() {
   return useQuery({
@@ -24,6 +24,15 @@ export function useEquipment() {
     queryKey: ['equipment'],
     queryFn: async () =>
       unwrap(await supabase.from('equipment').select('*').order('name')) as Equipment[],
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useGymBrands() {
+  return useQuery({
+    queryKey: ['gym_brands'],
+    queryFn: async () =>
+      unwrap(await supabase.from('gym_brands').select('*').order('name')) as GymBrand[],
     staleTime: 5 * 60_000,
   })
 }

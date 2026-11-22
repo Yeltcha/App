@@ -33,6 +33,23 @@ insert into public.workouts (id, program_id, name, position) values
   ('50000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000001', 'Haut du corps', 1);
 insert into public.workout_exercises (workout_id, exercise_id, position) values ('50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 0);
 
+-- Marques de salle : la marque saisie sur une machine est rattachée à la salle
+do $$ declare b uuid; begin
+  select brand_id into b from public.equipment where id = '20000000-0000-0000-0000-000000000001';
+  assert b is not null, 'la marque de la machine est rattachée à la salle';
+  assert (select gym_id from public.gym_brands where id = b) = '10000000-0000-0000-0000-000000000001', 'marque dans la salle A';
+  update public.gym_brands set name = 'TechnoGym' where id = b;
+  assert (select brand from public.equipment where id = '20000000-0000-0000-0000-000000000001') = 'TechnoGym', 'renommer la marque met à jour la machine';
+  insert into public.gym_brands (id, gym_id, name) values ('60000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002', 'GYM80');
+  begin
+    update public.equipment set brand_id = '60000000-0000-0000-0000-000000000001' where id = '20000000-0000-0000-0000-000000000001';
+    assert false, 'une marque d’une autre salle aurait dû être refusée';
+  exception when raise_exception then null;
+  end;
+  delete from public.gym_brands where id = b;
+  assert (select brand from public.equipment where id = '20000000-0000-0000-0000-000000000001') is null, 'supprimer la marque garde la machine, sans marque';
+end $$;
+
 do $$ begin
   assert (select count(*) from public.gym_exercises where gym_id = '10000000-0000-0000-0000-000000000001' and name like 'Test %') = 2, 'salle A : 2 exercices';
   assert (select count(*) from public.gym_exercises where gym_id = '10000000-0000-0000-0000-000000000002' and name like 'Test %') = 1, 'salle B : presse indisponible';
@@ -52,6 +69,14 @@ do $$ begin
   begin
     insert into public.exercises (name, muscle_group) values ('Triche', 'dos');
     assert false, 'insertion exercice aurait dû échouer';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+do $$ begin
+  assert (select count(*) from public.gym_brands) >= 1, 'athlète voit les marques des salles';
+  begin
+    insert into public.gym_brands (gym_id, name) values ('10000000-0000-0000-0000-000000000001', 'Triche');
+    assert false, 'insertion marque aurait dû échouer';
   exception when insufficient_privilege then null;
   end;
 end $$;

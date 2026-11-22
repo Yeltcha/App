@@ -53,22 +53,21 @@ export async function startSession({ athleteId, gymId, workout }: StartOptions):
     const ids = planned.map((p) => p.exercise_id)
     const needsMax = planned.filter((p) => plannedSets(p).some((s) => s.target_rpe !== null && s.target_weight_kg === null))
       .map((p) => p.exercise_id)
-    // Machines : seulement si l'une est programmée ou qu'une marque est visée
-    const needsMachines = planned.some((p) => p.equipment_id || p.equipment_brand)
+    // Machines : seulement si l'une est programmée
+    const needsMachines = planned.some((p) => p.equipment_id)
     const [last, maxes, machines] = await Promise.all([
       lastSessionSets(athleteId, ids),
       referenceMaxes(athleteId, needsMax),
       needsMachines ? loadMachines(ids) : Promise.resolve({ equipment: [] as Equipment[], links: [] as Link[] }),
     ])
     const machineFor = (p: WorkoutExercise) => needsMachines
-      ? resolveMachine({ exerciseId: p.exercise_id, equipmentId: p.equipment_id, brand: p.equipment_brand }, gymId, machines.equipment, machines.links)
+      ? resolveMachine({ exerciseId: p.exercise_id, equipmentId: p.equipment_id }, gymId, machines.equipment, machines.links)
       : null
     const sets: Partial<SessionSet>[] = planned.flatMap((p, index) =>
       plannedSets(p).map((planned, i) => ({
         session_id: session.id,
         exercise_id: p.exercise_id,
         equipment_id: machineFor(p),
-        equipment_brand: p.equipment_brand,
         exercise_position: index,
         set_number: i + 1,
         reps: planned.rep_min,

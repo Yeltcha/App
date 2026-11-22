@@ -919,3 +919,19 @@ progress { inline-size: 100%; accent-color: var(--cuivre); }
 .sets-table .set-before { display: block; margin-block-start: 0.15rem; font-size: 0.68rem; color: var(--texte-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sets-table tbody td, .sets-table tbody th { vertical-align: top; }
 .sets-table tbody th { padding-block-start: 0.85rem; }
+
+/* Salles : marques et machines */
+.brand-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.brand-chips li {
+  display: inline-flex; align-items: center; gap: 0.2rem;
+  padding: 0.1rem 0.2rem 0.1rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--bord);
+  background: var(--champ);
+  font-weight: 600;
+}
+.brand-chips .icon-button { min-block-size: 1.9rem; min-inline-size: 1.9rem; padding: 0; }
+.machine-group { padding-inline-start: 0.75rem; border-inline-start: 2px solid var(--bord); }
+.machine-row { padding-block: 0.2rem; }
+.add-machine { padding-block-start: 0.5rem; border-block-start: 1px solid var(--bord); }
+.machine-exercises { border: 0; padding: 0; margin: 0; max-block-size: 55vh; overflow-y: auto; }
