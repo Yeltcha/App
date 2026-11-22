@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase, unwrap } from './supabase'
 import type { Session, SessionSet, Workout, WorkoutExercise } from './types'
 import { referenceMaxes } from './oneRepMax'
-import { plannedSetLoad, plannedSets } from './setPlan'
+import { plannedSets } from './setPlan'
+import { lastSessionSets, prefillWeight } from './lastSession'
 import { resolveMachine, type Link } from './machines'
 import type { Equipment } from './types'
 
@@ -22,26 +23,6 @@ export function useActiveSession(userId: string | undefined) {
           .maybeSingle(),
       ) as Session | null,
   })
-}
-
-/** Dernière charge et répétitions réalisées par l'athlète pour chaque exercice. */
-export async function lastPerformances(athleteId: string, exerciseIds: string[]) {
-  const result = new Map<string, { weight_kg: number; reps: number }>()
-  if (exerciseIds.length === 0) return result
-  const rows = unwrap(
-    await supabase
-      .from('session_sets')
-      .select('exercise_id, weight_kg, reps, completed_at, sessions!inner(athlete_id)')
-      .eq('sessions.athlete_id', athleteId)
-      .eq('done', true)
-      .in('exercise_id', exerciseIds)
-      .order('completed_at', { ascending: false })
-      .limit(500),
-  ) as { exercise_id: string; weight_kg: number; reps: number }[]
-  for (const row of rows) {
-    if (!result.has(row.exercise_id)) result.set(row.exercise_id, { weight_kg: Number(row.weight_kg), reps: row.reps })
-  }
-  return result
 }
 
 interface StartOptions {
@@ -75,7 +56,7 @@ export async function startSession({ athleteId, gymId, workout }: StartOptions):
     // Machines : seulement si l'une est programmée ou qu'une marque est visée
     const needsMachines = planned.some((p) => p.equipment_id || p.equipment_brand)
     const [last, maxes, machines] = await Promise.all([
-      lastPerformances(athleteId, ids),
+      lastSessionSets(athleteId, ids),
       referenceMaxes(athleteId, needsMax),
       needsMachines ? loadMachines(ids) : Promise.resolve({ equipment: [] as Equipment[], links: [] as Link[] }),
     ])
@@ -91,8 +72,8 @@ export async function startSession({ athleteId, gymId, workout }: StartOptions):
         exercise_position: index,
         set_number: i + 1,
         reps: planned.rep_min,
-        // Charge : fixée par le coach, sinon calculée au RPE depuis le 1RM, sinon la dernière réalisée
-        weight_kg: plannedSetLoad(planned, p.specialty, maxes.get(p.exercise_id)) ?? last.get(p.exercise_id)?.weight_kg ?? 0,
+        // Charge préremplie, modifiable : voir prefillWeight (dernière fois en bodybuilding, RPE en force)
+        weight_kg: prefillWeight(p.specialty, planned, i, last.get(p.exercise_id), maxes.get(p.exercise_id)),
         rest_sec: p.rest_sec,
         specialty: p.specialty,
         target_rpe: p.specialty === 'cardio' ? null : planned.target_rpe,
