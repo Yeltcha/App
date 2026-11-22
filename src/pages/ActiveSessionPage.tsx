@@ -15,6 +15,8 @@ import { BarLoad } from '../components/BarLoad'
 import { ProgressRing } from '../components/ProgressRing'
 import { isBarbellExercise } from '../lib/plates'
 import { readRestEnd, writeRestEnd } from '../lib/restStorage'
+import { formatRpe, percentOf1RM, RPE_VALUES, rirFor } from '../lib/rpe'
+import { formatNumber } from '../lib/numbers'
 
 export default function ActiveSessionPage() {
   const { profile } = useAuth()
@@ -119,6 +121,8 @@ function SessionRunner({ session }: { session: Session }) {
       reps: last.reps,
       weight_kg: last.weight_kg,
       rest_sec: last.rest_sec,
+      specialty: last.specialty,
+      target_rpe: last.target_rpe,
     })
     if (error) setError(error.message)
     await sets.refetch()
@@ -203,6 +207,12 @@ function SessionRunner({ session }: { session: Session }) {
         const prev = previous.data?.get(group[0].exercise_id)
         const nextSet = group.find((s) => !s.done) ?? group.at(-1)!
         const headingId = `ex-${position}`
+        const specialty = group[0].specialty
+        const cardio = specialty === 'cardio'
+        // RPE : cible et ressenti sur les exercices de force (ou dès qu'un RPE cible est fixé)
+        const withRpe = specialty === 'force' || group[0].target_rpe !== null
+        const targetRpe = group[0].target_rpe !== null ? Number(group[0].target_rpe) : null
+        const targetPercent = targetRpe !== null ? percentOf1RM(nextSet.reps, targetRpe) : null
         return (
           <section key={position} className="card exercise-block" aria-labelledby={headingId}>
             <h2 id={headingId}><span className="station" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>{exercise?.name ?? 'Exercice'}</h2>
@@ -210,21 +220,28 @@ function SessionRunner({ session }: { session: Session }) {
               {eq && <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>}
               <span>{prev ? `Dernière fois : ${formatKg(prev.weight_kg)} × ${prev.reps}` : 'Première fois sur cet exercice'}</span>
             </p>
-            {isBarbellExercise(exercise?.name) && <BarLoad weightKg={Number(nextSet.weight_kg)} />}
-            <table className="sets-table">
+            {targetRpe !== null && (
+              <p className="rpe-target">
+                <span className="rpe-target-value">RPE {formatRpe(targetRpe)}</span>
+                <span>cible, soit {formatRpe(rirFor(targetRpe))} rép. en réserve{targetPercent !== null ? ` · ${formatNumber(targetPercent)} % du 1RM` : ''}</span>
+              </p>
+            )}
+            {!cardio && isBarbellExercise(exercise?.name) && <BarLoad weightKg={Number(nextSet.weight_kg)} />}
+            <table className={withRpe ? 'sets-table with-rpe' : 'sets-table'}>
               <caption className="visually-hidden">Séries de {exercise?.name}</caption>
               <thead>
                 <tr>
                   <th scope="col">Série</th>
                   <th scope="col">kg</th>
-                  <th scope="col">Reps</th>
+                  <th scope="col">{cardio ? 'Min' : 'Reps'}</th>
+                  {withRpe && <th scope="col"><abbr title="RPE ressenti">RPE</abbr></th>}
                   <th scope="col">Faite</th>
                   <th scope="col"><span className="visually-hidden">Supprimer</span></th>
                 </tr>
               </thead>
               <tbody>
                 {group.map((set) => (
-                  <SetRow key={set.id} set={set} exerciseName={exercise?.name ?? ''}
+                  <SetRow key={set.id} set={set} exerciseName={exercise?.name ?? ''} cardio={cardio} withRpe={withRpe}
                     onUpdate={(patch) => updateSet(set.id, patch)}
                     onToggle={() => toggleDone(set)}
                     onRemove={() => removeSet(set)} />
@@ -286,12 +303,15 @@ function RpeField() {
 interface SetRowProps {
   set: SessionSet
   exerciseName: string
+  cardio: boolean
+  /** Affiche la saisie du RPE ressenti */
+  withRpe: boolean
   onUpdate: (patch: Partial<SessionSet>) => void
   onToggle: () => void
   onRemove: () => void
 }
 
-function SetRow({ set, exerciseName, onUpdate, onToggle, onRemove }: SetRowProps) {
+function SetRow({ set, exerciseName, cardio, withRpe, onUpdate, onToggle, onRemove }: SetRowProps) {
   // État local pour que la case réagisse immédiatement, avant la réponse du serveur
   const [done, setDone] = useState(set.done)
   const [syncedDone, setSyncedDone] = useState(set.done)
@@ -330,11 +350,21 @@ function SetRow({ set, exerciseName, onUpdate, onToggle, onRemove }: SetRowProps
           onBlur={(e) => commitWeight(e.currentTarget)} />
       </td>
       <td>
-        <input type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="done" aria-label={`Répétitions, ${label}`}
+        <input type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="done" aria-label={`${cardio ? 'Minutes' : 'Répétitions'}, ${label}`}
           defaultValue={set.reps}
           onInput={(e) => e.currentTarget.setCustomValidity('')}
           onBlur={(e) => commitReps(e.currentTarget)} />
       </td>
+      {withRpe && (
+        <td>
+          <select className="rpe-select" aria-label={`RPE ressenti, ${label}`}
+            value={set.rpe !== null ? String(Number(set.rpe)) : ''}
+            onChange={(e) => onUpdate({ rpe: e.target.value ? Number(e.target.value) : null })}>
+            <option value="">–</option>
+            {[5, 5.5, ...RPE_VALUES].map((r) => <option key={r} value={String(r)}>{formatRpe(r)}</option>)}
+          </select>
+        </td>
+      )}
       <td>
         <label className="check">
           <input type="checkbox" checked={done} onChange={() => { setDone(!done); onToggle() }} />

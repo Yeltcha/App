@@ -772,3 +772,81 @@ progress { inline-size: 100%; accent-color: var(--cuivre); }
 @media (forced-colors: active) {
   .tab-bar a[aria-current='page'], .staff-nav a[aria-current='page'] { outline: 2px solid CanvasText; }
 }
+
+/* ==========================================================================
+   Spécialité et programmation au RPE
+   ========================================================================== */
+.specialty-tag {
+  display: inline-block;
+  margin-inline-end: 0.45rem;
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--bord);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--texte);
+  vertical-align: 0.1em;
+}
+.specialty-tag.force { border-color: transparent; background: var(--degrade); color: var(--sur-cuivre); }
+.specialty-tag.cardio { color: var(--texte-2); }
+
+/* RPE cible pendant la séance */
+.rpe-target { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.6rem; margin: 0; color: var(--texte-2); font-size: var(--step--1); }
+.rpe-target-value {
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  background: var(--degrade);
+  color: var(--sur-cuivre);
+  font-weight: 700;
+  font-size: var(--step-0);
+  font-variant-numeric: tabular-nums;
+}
+
+/* RPE ressenti, dans le tableau des séries */
+.sets-table .rpe-select {
+  appearance: none;
+  background-image: none;
+  min-block-size: 3rem;
+  inline-size: 3rem;
+  min-inline-size: 0;
+  padding-inline: 0.15rem;
+  text-align: center;
+  text-align-last: center;
+  font-size: var(--step-0);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background-color: var(--champ);
+  border-radius: var(--r-champ);
+}
+.sets-table tr.done .rpe-select { background-color: transparent; }
+.set-rpe { color: var(--texte-2); font-size: var(--step-0); font-weight: 400; }
+
+/* Charge calculée au RPE, dans la création de séance */
+.rpe-load {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--r-ligne);
+  border: 1px solid rgb(232 129 58 / 0.35);
+  background: rgb(232 129 58 / 0.08);
+  color: var(--texte-2);
+}
+.rpe-load-kg { font-size: var(--step-3); font-weight: 700; color: var(--texte); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+
+.rpe-details summary { cursor: pointer; color: var(--cuivre-clair); font-weight: 500; min-block-size: 2.75rem; display: flex; align-items: center; }
+.rpe-table-wrap { overflow-x: auto; border-radius: var(--r-ligne); border: 1px solid var(--bord); background: var(--champ); }
+.rpe-table-wrap:focus-visible { outline: 2px solid var(--cuivre-clair); outline-offset: 2px; }
+.rpe-table { border-collapse: collapse; inline-size: 100%; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.rpe-table th, .rpe-table td { padding: 0.4rem 0.45rem; text-align: center; white-space: nowrap; }
+.rpe-table thead th { font-weight: 600; color: var(--texte-2); border-block-end: 1px solid var(--bord); }
+.rpe-table .rpe-head, .rpe-table .rir-head { display: block; }
+.rpe-table .rir-head { font-weight: 400; font-size: 0.7rem; }
+.rpe-table tbody th { color: var(--texte-2); font-weight: 600; position: sticky; inset-inline-start: 0; background: #141212; }
+.rpe-table thead th:first-child { position: sticky; inset-inline-start: 0; background: #141212; }
+.rpe-table thead th.on { color: var(--cuivre-clair); }
+.rpe-table tbody tr.on > * { background-color: rgb(232 129 58 / 0.08); }
+.rpe-table td.picked { background: var(--degrade); color: var(--sur-cuivre); font-weight: 700; border-radius: 8px; }
+.rpe-table .rpe-kg { display: block; font-size: 0.7rem; font-weight: 600; }
+/* Avec la colonne RPE, les chiffres rétrécissent un peu pour tenir sur un téléphone */
+.sets-table.with-rpe input[type='text'] { font-size: var(--step-1); }

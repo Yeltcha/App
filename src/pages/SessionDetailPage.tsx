@@ -6,6 +6,7 @@ import { byId, useEquipment, useExercises, useGyms } from '../lib/queries'
 import type { Session, SessionSet } from '../lib/types'
 import { formatDuration, formatLongDate, localDateOf } from '../lib/dates'
 import { estimate1RM, formatKg } from '../lib/numbers'
+import { formatRpe } from '../lib/rpe'
 import { ConfirmDialog } from '../components/Dialog'
 import { ErrorMessage, Loading } from '../components/Feedback'
 
@@ -72,7 +73,12 @@ export default function SessionDetailPage() {
             <h2 id={`d-${pos}`}>{ex?.name}</h2>
             {eq && <p className="muted small">{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</p>}
             <ol className="set-summary">
-              {group.map((s) => <li key={s.id}>{formatKg(Number(s.weight_kg))} × {s.reps}</li>)}
+              {group.map((s) => (
+                <li key={s.id}>
+                  {formatKg(Number(s.weight_kg))} × {s.reps}{s.specialty === 'cardio' ? ' min' : ''}
+                  {s.rpe !== null && <span className="set-rpe"> · RPE {formatRpe(Number(s.rpe))}{s.target_rpe !== null ? ` (cible ${formatRpe(Number(s.target_rpe))})` : ''}</span>}
+                </li>
+              ))}
             </ol>
             {best > 0 && <p className="small muted">1RM estimé : {formatKg(best)}</p>}
           </section>

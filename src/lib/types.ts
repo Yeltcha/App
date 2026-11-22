@@ -34,6 +34,14 @@ export const EQUIPMENT_LABELS: Record<EquipmentKind, string> = {
   autre: 'Autre',
 }
 
+export type Specialty = 'force' | 'bodybuilding' | 'cardio'
+
+export const SPECIALTY_LABELS: Record<Specialty, string> = {
+  force: 'Force',
+  bodybuilding: 'Bodybuilding',
+  cardio: 'Cardio',
+}
+
 export const ROLE_LABELS: Record<AppRole, string> = {
   admin: 'Administrateur',
   coach: 'Coach',
@@ -104,6 +112,9 @@ export interface WorkoutExercise {
   target_weight_kg: number | null
   rest_sec: number
   notes: string | null
+  specialty: Specialty
+  /** RPE cible (6 à 10, par demi-points) */
+  target_rpe: number | null
 }
 
 export interface Session {
@@ -127,7 +138,10 @@ export interface SessionSet {
   set_number: number
   reps: number
   weight_kg: number
+  /** RPE ressenti par l'athlète */
   rpe: number | null
+  target_rpe: number | null
+  specialty: Specialty | null
   rest_sec: number
   done: boolean
   completed_at: string | null
