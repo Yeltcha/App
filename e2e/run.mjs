@@ -153,7 +153,9 @@ try {
   assert(await athlete.getByLabel('Dans quelle salle es-tu ?').inputValue() !== '', 'la salle de la séance est présélectionnée')
   await athlete.getByRole('button', { name: 'C’est parti' }).click()
   await athlete.getByRole('heading', { name: 'Jambes', level: 1 }).waitFor()
-  assert(await athlete.getByRole('heading', { name: 'Squat barre' }).isVisible(), 'les exercices du programme sont chargés')
+  // Les séries se chargent après le titre : on attend le premier exercice au lieu de lire son état tout de suite
+  await athlete.getByRole('heading', { name: 'Squat barre' }).waitFor()
+  assert(true, 'les exercices du programme sont chargés')
 
   step('Saisie des séries et minuteur de repos')
   const weight1 = athlete.getByLabel('Charge, Squat barre, série 1')

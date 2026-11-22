@@ -3,9 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router'
 import { ensureTemporal } from './lib/dates'
-import '@fontsource-variable/familjen-grotesk/wght.css'
-import '@fontsource-variable/big-shoulders/wght.css'
-import '@fontsource-variable/big-shoulders-stencil/wght.css'
+import '@fontsource-variable/outfit/wght.css'
 import './index.css'
 
 await ensureTemporal()
