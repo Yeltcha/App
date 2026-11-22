@@ -7,6 +7,7 @@ import type { Session, SessionSet } from '../lib/types'
 import { formatDuration, formatLongDate, localDateOf } from '../lib/dates'
 import { estimate1RM, formatKg } from '../lib/numbers'
 import { formatRpe } from '../lib/rpe'
+import { SET_KIND_LABELS } from '../lib/setPlan'
 import { ConfirmDialog } from '../components/Dialog'
 import { ErrorMessage, Loading } from '../components/Feedback'
 
@@ -75,6 +76,7 @@ export default function SessionDetailPage() {
             <ol className="set-summary">
               {group.map((s) => (
                 <li key={s.id}>
+                  {s.set_kind !== 'normal' && <span className="set-kind">{SET_KIND_LABELS[s.set_kind]}</span>}
                   {formatKg(Number(s.weight_kg))} × {s.reps}{s.specialty === 'cardio' ? ' min' : ''}
                   {s.rpe !== null && <span className="set-rpe"> · RPE {formatRpe(Number(s.rpe))}{s.target_rpe !== null ? ` (cible ${formatRpe(Number(s.target_rpe))})` : ''}</span>}
                 </li>

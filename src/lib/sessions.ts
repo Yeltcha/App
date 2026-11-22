@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase, unwrap } from './supabase'
 import type { Session, SessionSet, Workout, WorkoutExercise } from './types'
-import { plannedRpeLoad, referenceMaxes } from './oneRepMax'
+import { referenceMaxes } from './oneRepMax'
+import { plannedSetLoad, plannedSets } from './setPlan'
 
 export const ACTIVE_SESSION_KEY = ['active-session'] as const
 
@@ -67,27 +68,25 @@ export async function startSession({ athleteId, gymId, workout }: StartOptions):
       await supabase.from('workout_exercises').select('*').eq('workout_id', workout.id).order('position'),
     ) as WorkoutExercise[]
     const ids = planned.map((p) => p.exercise_id)
-    const needsMax = planned.filter((p) => p.target_rpe !== null && p.target_weight_kg === null).map((p) => p.exercise_id)
+    const needsMax = planned.filter((p) => plannedSets(p).some((s) => s.target_rpe !== null && s.target_weight_kg === null))
+      .map((p) => p.exercise_id)
     const [last, maxes] = await Promise.all([lastPerformances(athleteId, ids), referenceMaxes(athleteId, needsMax)])
-    const sets: Partial<SessionSet>[] = planned.flatMap((p, index) => {
-      // Charge : fixée par le coach, sinon calculée au RPE depuis le 1RM, sinon la dernière réalisée
-      const weight = p.target_weight_kg
-        ?? plannedRpeLoad(p, maxes.get(p.exercise_id))?.kg
-        ?? last.get(p.exercise_id)?.weight_kg
-        ?? 0
-      return Array.from({ length: p.target_sets }, (_, i) => ({
+    const sets: Partial<SessionSet>[] = planned.flatMap((p, index) =>
+      plannedSets(p).map((planned, i) => ({
         session_id: session.id,
         exercise_id: p.exercise_id,
         equipment_id: p.equipment_id,
         exercise_position: index,
         set_number: i + 1,
-        reps: p.rep_min,
-        weight_kg: weight,
+        reps: planned.rep_min,
+        // Charge : fixée par le coach, sinon calculée au RPE depuis le 1RM, sinon la dernière réalisée
+        weight_kg: plannedSetLoad(planned, p.specialty, maxes.get(p.exercise_id)) ?? last.get(p.exercise_id)?.weight_kg ?? 0,
         rest_sec: p.rest_sec,
         specialty: p.specialty,
-        target_rpe: p.target_rpe,
-      }))
-    })
+        target_rpe: p.specialty === 'cardio' ? null : planned.target_rpe,
+        set_kind: planned.kind,
+      })),
+    )
     if (sets.length > 0) unwrap(await supabase.from('session_sets').insert(sets))
   }
   return session

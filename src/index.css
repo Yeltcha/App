@@ -850,3 +850,50 @@ progress { inline-size: 100%; accent-color: var(--cuivre); }
 .rpe-table .rpe-kg { display: block; font-size: 0.7rem; font-weight: 600; }
 /* Avec la colonne RPE, les chiffres rétrécissent un peu pour tenir sur un téléphone */
 .sets-table.with-rpe input[type='text'] { font-size: var(--step-1); }
+
+/* ==========================================================================
+   Réglage série par série
+   ========================================================================== */
+.set-plan { border: 0; padding: 0; margin: 0; }
+.set-plan legend { padding: 0 0 0.4rem; font-size: var(--step--1); color: var(--texte-2); }
+.set-plan-list { display: grid; gap: 0.5rem; }
+.set-plan-row {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--r-ligne);
+  border: 1px solid var(--bord);
+  background: var(--champ);
+}
+.set-plan-row.top { border-color: rgb(232 129 58 / 0.55); background: rgb(232 129 58 / 0.1); }
+.set-plan-row.warmup { opacity: 0.85; }
+.set-plan-head { display: flex; align-items: center; gap: 0.6rem; }
+.set-plan-head select { inline-size: auto; flex: 0 1 auto; min-block-size: 2.5rem; padding-block: 0.3rem; }
+.set-plan-num {
+  display: grid; place-items: center;
+  inline-size: 2rem; block-size: 2rem; flex: none;
+  border-radius: 50%;
+  background: var(--verre-fort);
+  font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.set-plan-row.top .set-plan-num { background: var(--degrade); color: var(--sur-cuivre); }
+.set-plan-load { margin-inline-start: auto; font-weight: 700; color: var(--cuivre-clair); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.set-plan-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem; }
+.set-plan-fields.cardio { grid-template-columns: minmax(0, 6rem); }
+.set-plan-fields label { display: grid; gap: 0.2rem; font-size: 0.72rem; color: var(--texte-2); }
+.set-plan-fields input, .set-plan-fields select {
+  min-block-size: 2.6rem; padding-inline: 0.4rem; text-align: center; text-align-last: center;
+  font-size: var(--step-0); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--texte);
+}
+
+/* Résumé dans le programme et l'historique */
+.plan-sets { margin: 0.2rem 0 0; padding-inline-start: 1.3rem; display: grid; gap: 0.1rem; color: var(--texte-2); }
+.set-kind {
+  display: inline-block; margin-inline-end: 0.4rem; padding: 0 0.45rem;
+  border-radius: 999px; border: 1px solid var(--bord);
+  font-size: 0.7rem; font-weight: 600; color: var(--texte); vertical-align: 0.1em;
+}
+.plan-sets li.top .set-kind, .set-summary .set-kind { border-color: rgb(232 129 58 / 0.5); color: var(--cuivre-clair); }
+
+/* Type et RPE cible de chaque série, sous son numéro */
+.sets-table .set-target { display: grid; font-size: 0.62rem; font-weight: 600; line-height: 1.15; color: var(--cuivre-clair); letter-spacing: 0; }

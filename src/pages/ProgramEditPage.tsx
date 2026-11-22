@@ -8,6 +8,7 @@ import { formatKg, formatNumber, parseDecimal } from '../lib/numbers'
 import { plannedRpeLoad, referenceMaxes, type ReferenceMax } from '../lib/oneRepMax'
 import { formatRpe, RPE_VALUES, rirFor } from '../lib/rpe'
 import { formatShortDate } from '../lib/dates'
+import { describeSet, plannedSetLoad, plannedSets, rampRpe, SET_KIND_LABELS, SET_KINDS, type PlannedSet, type SetKind } from '../lib/setPlan'
 import { RpeTable } from '../components/RpeTable'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
@@ -277,25 +278,30 @@ function PlanRow({ item, index, count, max, onEdit, onMove, onDelete }: {
 }) {
   const exercises = byId(useGymExercises(null).data)
   const name = exercises.get(item.exercise_id)?.name ?? 'Exercice'
-  const reps = item.rep_max ? `${item.rep_min}–${item.rep_max}` : `${item.rep_min}`
-  const rpeLoad = item.target_weight_kg === null ? plannedRpeLoad(item, max) : null
-  let detail: string
-  if (item.specialty === 'cardio') {
-    detail = `${item.target_sets} × ${reps} min`
-  } else {
-    detail = `${item.target_sets} × ${reps}`
-    if (item.target_rpe !== null) detail += ` @ RPE ${formatRpe(Number(item.target_rpe))}`
-    if (item.target_weight_kg) detail += `, ${formatKg(Number(item.target_weight_kg))}`
-    else if (rpeLoad) detail += `, ≈ ${formatKg(rpeLoad.kg)}`
-  }
+  const sets = plannedSets(item)
+  const varied = item.set_plan !== null
+  const first = sets[0]
+  const summary = varied
+    ? `${sets.length} ${item.specialty === 'cardio' ? 'blocs' : 'séries'} réglées une par une`
+    : `${item.target_sets} × ${describeSet(first, item.specialty, plannedSetLoad(first, item.specialty, max))}`
   return (
     <li className="row between wrap plan-row">
       <span className="item-text">
         <strong>{name}</strong>
         <span className="muted small">
           <span className={`specialty-tag ${item.specialty}`}>{SPECIALTY_LABELS[item.specialty]}</span>
-          {detail}, repos {item.rest_sec} s
+          {summary}, repos {item.rest_sec} s
         </span>
+        {varied && (
+          <ol className="plan-sets small">
+            {sets.map((set, i) => (
+              <li key={i} className={set.kind}>
+                {set.kind !== 'normal' && <span className="set-kind">{SET_KIND_LABELS[set.kind]}</span>}
+                {describeSet(set, item.specialty, plannedSetLoad(set, item.specialty, max))}
+              </li>
+            ))}
+          </ol>
+        )}
       </span>
       <span className="row">
         <button type="button" className="icon-button" aria-label={`Monter ${name}`} disabled={index === 0} onClick={() => onMove(-1)}>↑</button>
@@ -309,6 +315,14 @@ function PlanRow({ item, index, count, max, onEdit, onMove, onDelete }: {
 
 const SPECIALTIES: Specialty[] = ['force', 'bodybuilding', 'cardio']
 
+interface RowState { kind: SetKind; repMin: string; repMax: string; rpe: string; weight: string }
+
+const kgText = (kg: number | null | undefined) => (kg == null ? '' : String(Number(kg)).replace('.', ','))
+const toRow = (s: PlannedSet): RowState => ({
+  kind: s.kind, repMin: String(s.rep_min), repMax: s.rep_max == null ? '' : String(s.rep_max),
+  rpe: s.target_rpe == null ? '' : String(s.target_rpe), weight: kgText(s.target_weight_kg),
+})
+
 function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
   workout: Workout; item: WorkoutExercise | null; nextPosition: number
   /** Le programme est attribué à un athlète */
@@ -321,9 +335,13 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
   const links = useExerciseEquipment()
   const [exerciseId, setExerciseId] = useState(item?.exercise_id ?? '')
   const [specialty, setSpecialty] = useState<Specialty>(item?.specialty ?? 'bodybuilding')
+  const [setCount, setSetCount] = useState(String(item?.target_sets ?? 3))
   const [repMin, setRepMin] = useState(String(item?.rep_min ?? 8))
+  const [repMax, setRepMax] = useState(item?.rep_max != null ? String(item.rep_max) : '')
   const [rpe, setRpe] = useState(item?.target_rpe != null ? String(Number(item.target_rpe)) : '')
-  const [weightText, setWeightText] = useState(item?.target_weight_kg != null ? String(Number(item.target_weight_kg)).replace('.', ',') : '')
+  const [weightText, setWeightText] = useState(kgText(item?.target_weight_kg))
+  const [perSet, setPerSet] = useState(Boolean(item?.set_plan))
+  const [rows, setRows] = useState<RowState[]>(() => (item?.set_plan ? plannedSets(item).map(toRow) : []))
   const [error, setError] = useState<string | null>(null)
   const cardio = specialty === 'cardio'
   const targetRpe = !cardio && rpe ? Number(rpe) : null
@@ -334,28 +352,79 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
     links.data?.some((l) => l.exercise_id === exerciseId && l.equipment_id === eq.id) &&
     (!workout.gym_id || eq.gym_id === workout.gym_id))
 
+  const commonRow = (): RowState => ({ kind: 'normal', repMin, repMax, rpe, weight: weightText })
+
+  function resize(list: RowState[], count: number): RowState[] {
+    if (!(count >= 1 && count <= 20)) return list
+    if (list.length >= count) return list.slice(0, count)
+    const model = list.at(-1) ?? commonRow()
+    return [...list, ...Array.from({ length: count - list.length }, () => ({ ...model, kind: model.kind === 'top' ? 'backoff' as const : model.kind }))]
+  }
+
+  function togglePerSet(on: boolean) {
+    setPerSet(on)
+    // Première ouverture : chaque série reprend les valeurs communes
+    if (on) setRows(resize(rows, Number(setCount)))
+  }
+
+  function changeCount(value: string) {
+    setSetCount(value)
+    if (perSet) setRows((list) => resize(list, Number(value)))
+  }
+
+  const patchRow = (index: number, patch: Partial<RowState>) =>
+    setRows((list) => list.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+
+  function rampUp() {
+    const ramped = rampRpe(rows.map((r) => ({ ...r, target_rpe: r.rpe ? Number(r.rpe) : null })))
+    setRows(ramped.map(({ target_rpe, ...r }) => ({ ...r, rpe: target_rpe === null ? '' : String(target_rpe) })))
+  }
+
+  function topAndBackoff() {
+    setRows((list) => list.map((r, i) => ({ ...r, kind: i === 0 ? 'top' : 'backoff' })))
+  }
+
+  function parseRow(r: RowState, index: number): PlannedSet | string {
+    const min = Number(r.repMin)
+    if (!Number.isInteger(min) || min < 1 || min > 100) return `Série ${index + 1} : nombre de ${cardio ? 'minutes' : 'répétitions'} invalide.`
+    const maxReps = !cardio && r.repMax ? Number(r.repMax) : null
+    if (maxReps !== null && !(maxReps >= min && maxReps <= 100)) return `Série ${index + 1} : le maximum de répétitions doit être supérieur au minimum.`
+    const weight = !cardio && r.weight.trim() ? parseDecimal(r.weight) : null
+    if (!cardio && r.weight.trim() && weight === null) return `Série ${index + 1} : charge invalide.`
+    return { kind: r.kind, rep_min: min, rep_max: maxReps, target_rpe: !cardio && r.rpe ? Number(r.rpe) : null, target_weight_kg: weight }
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const f = new FormData(e.currentTarget)
-    const repMin = Number(f.get('rep_min'))
-    const repMaxRaw = String(f.get('rep_max') ?? '')
-    const weightRaw = cardio ? '' : String(f.get('weight') ?? '').trim()
-    const weight = weightRaw ? parseDecimal(weightRaw) : null
-    if (weightRaw && weight === null) return setError('Charge invalide.')
+    let plan: PlannedSet[] | null = null
+    let first: PlannedSet
+    if (perSet) {
+      const parsed = rows.map(parseRow)
+      const invalid = parsed.find((p): p is string => typeof p === 'string')
+      if (invalid) return setError(invalid)
+      plan = parsed as PlannedSet[]
+      // Les champs communs reprennent la première série de travail (affichages résumés)
+      first = plan.find((p) => p.kind !== 'warmup') ?? plan[0]
+    } else {
+      const parsed = parseRow(commonRow(), 0)
+      if (typeof parsed === 'string') return setError(parsed.replace('Série 1 : ', ''))
+      first = parsed
+    }
     const values = {
       workout_id: workout.id,
       exercise_id: String(f.get('exercise')),
       equipment_id: String(f.get('equipment') ?? '') || null,
       specialty,
-      target_sets: Number(f.get('sets')),
-      rep_min: repMin,
-      rep_max: !cardio && repMaxRaw ? Number(repMaxRaw) : null,
-      target_weight_kg: cardio ? null : weight,
-      target_rpe: targetRpe,
+      target_sets: plan ? plan.length : Number(setCount),
+      rep_min: first.rep_min,
+      rep_max: first.rep_max,
+      target_weight_kg: first.target_weight_kg,
+      target_rpe: first.target_rpe,
+      set_plan: plan,
       rest_sec: Number(f.get('rest')),
       notes: String(f.get('notes')).trim() || null,
     }
-    if (values.rep_max !== null && values.rep_max < repMin) return setError('Le maximum de répétitions doit être supérieur au minimum.')
     const { error } = item
       ? await supabase.from('workout_exercises').update(values).eq('id', item.id)
       : await supabase.from('workout_exercises').insert({ ...values, position: nextPosition })
@@ -394,25 +463,34 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
       <div className="grid-2">
         <div className="field">
           <label htmlFor="pf-sets">{cardio ? 'Blocs' : 'Séries'}</label>
-          <input id="pf-sets" name="sets" type="number" min={1} max={20} defaultValue={item?.target_sets ?? 3} required />
+          <input id="pf-sets" name="sets" type="number" min={1} max={20} value={setCount} onChange={(e) => changeCount(e.target.value)} required />
         </div>
         <div className="field">
           <label htmlFor="pf-rest">Repos (s)</label>
           <input id="pf-rest" name="rest" type="number" min={0} max={900} step={15} defaultValue={item?.rest_sec ?? 90} required />
         </div>
-        <div className="field">
-          <label htmlFor="pf-min">{cardio ? 'Minutes par bloc' : 'Répétitions min.'}</label>
-          <input id="pf-min" name="rep_min" type="number" min={1} max={100} value={repMin}
-            onChange={(e) => setRepMin(e.target.value)} required />
-        </div>
-        {!cardio && (
+        {!perSet && (
+          <div className="field">
+            <label htmlFor="pf-min">{cardio ? 'Minutes par bloc' : 'Répétitions min.'}</label>
+            <input id="pf-min" name="rep_min" type="number" min={1} max={100} value={repMin}
+              onChange={(e) => setRepMin(e.target.value)} required />
+          </div>
+        )}
+        {!perSet && !cardio && (
           <div className="field">
             <label htmlFor="pf-max">Répétitions max. (facultatif)</label>
-            <input id="pf-max" name="rep_max" type="number" min={1} max={100} defaultValue={item?.rep_max ?? ''} />
+            <input id="pf-max" name="rep_max" type="number" min={1} max={100} value={repMax} onChange={(e) => setRepMax(e.target.value)} />
           </div>
         )}
       </div>
-      {!cardio && (
+      <label className="check-row">
+        <input type="checkbox" checked={perSet} onChange={(e) => togglePerSet(e.target.checked)} />
+        Régler série par série
+      </label>
+      {perSet ? (
+        <SetPlanEditor rows={rows} cardio={cardio} specialty={specialty} max={max} assigned={assigned}
+          onPatch={patchRow} onRamp={rampUp} onTopBackoff={topAndBackoff} />
+      ) : !cardio && (
         <>
           <div className="field">
             <label htmlFor="pf-rpe">RPE cible (facultatif)</label>
@@ -437,13 +515,13 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
           {targetRpe !== null && !weightText.trim() && (
             <RpeLoadPreview assigned={assigned} max={max} reps={Number(repMin)} rpe={targetRpe} load={rpeLoad} />
           )}
-          {targetRpe !== null && (
-            <details className="rpe-details">
-              <summary>Table RPE, RIR et % du 1RM</summary>
-              <RpeTable reps={Number(repMin)} rpe={targetRpe} oneRepMaxKg={max?.kg} />
-            </details>
-          )}
         </>
+      )}
+      {!cardio && (targetRpe !== null || perSet) && (
+        <details className="rpe-details">
+          <summary>Table RPE, RIR et % du 1RM</summary>
+          <RpeTable reps={perSet ? undefined : Number(repMin)} rpe={perSet ? undefined : targetRpe} oneRepMaxKg={max?.kg} />
+        </details>
       )}
       <div className="field">
         <label htmlFor="pf-notes">Consignes (facultatif)</label>
@@ -452,6 +530,80 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
       {error && <p role="alert" className="error">{error}</p>}
       <button type="submit" className="primary">Enregistrer</button>
     </form>
+  )
+}
+
+function SetPlanEditor({ rows, cardio, specialty, max, assigned, onPatch, onRamp, onTopBackoff }: {
+  rows: RowState[]; cardio: boolean; specialty: Specialty; max: ReferenceMax | undefined; assigned: boolean
+  onPatch: (index: number, patch: Partial<RowState>) => void; onRamp: () => void; onTopBackoff: () => void
+}) {
+  const usesRpe = rows.some((r) => r.rpe && !r.weight.trim())
+  return (
+    <fieldset className="set-plan stack">
+      <legend>Séries une par une</legend>
+      {!cardio && (
+        <div className="row wrap">
+          <button type="button" onClick={onRamp}>Montée en RPE (+0,5)</button>
+          <button type="button" onClick={onTopBackoff}>Top set + back-off</button>
+        </div>
+      )}
+      <ol className="plain-list set-plan-list">
+        {rows.map((r, i) => {
+          const n = i + 1
+          const parsedWeight = r.weight.trim() ? parseDecimal(r.weight) : null
+          const load = cardio ? null : plannedSetLoad({
+            kind: r.kind, rep_min: Number(r.repMin), rep_max: null,
+            target_rpe: r.rpe ? Number(r.rpe) : null, target_weight_kg: parsedWeight,
+          }, specialty, max)
+          return (
+            <li key={i} className={`set-plan-row ${r.kind}`}>
+              <div className="set-plan-head">
+                <span className="set-plan-num" aria-hidden="true">{n}</span>
+                <select aria-label={`Type, série ${n}`} value={r.kind} onChange={(e) => onPatch(i, { kind: e.target.value as SetKind })}>
+                  {SET_KINDS.map((k) => <option key={k} value={k}>{SET_KIND_LABELS[k]}</option>)}
+                </select>
+                {load !== null && !r.weight.trim() && <span className="set-plan-load" aria-label={`Charge calculée, série ${n}`}>≈ {formatKg(load)}</span>}
+              </div>
+              <div className={cardio ? 'set-plan-fields cardio' : 'set-plan-fields'}>
+                <label>
+                  <span>{cardio ? 'Min' : 'Reps'}</span>
+                  <input type="number" min={1} max={100} required value={r.repMin} aria-label={`${cardio ? 'Minutes' : 'Répétitions min.'}, série ${n}`}
+                    onChange={(e) => onPatch(i, { repMin: e.target.value })} />
+                </label>
+                {!cardio && (
+                  <>
+                    <label>
+                      <span>Max</span>
+                      <input type="number" min={1} max={100} value={r.repMax} aria-label={`Répétitions max., série ${n}`}
+                        onChange={(e) => onPatch(i, { repMax: e.target.value })} />
+                    </label>
+                    <label>
+                      <span>RPE</span>
+                      <select value={r.rpe} aria-label={`RPE cible, série ${n}`} onChange={(e) => onPatch(i, { rpe: e.target.value })}>
+                        <option value="">–</option>
+                        {RPE_VALUES.map((v) => <option key={v} value={String(v)}>{formatRpe(v)}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span>kg</span>
+                      <input type="text" inputMode="decimal" value={r.weight} aria-label={`Charge, série ${n}`}
+                        onChange={(e) => onPatch(i, { weight: e.target.value })} />
+                    </label>
+                  </>
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+      {!cardio && (
+        <p className="hint">
+          kg vide : charge calculée au RPE depuis le 1RM, sinon la dernière charge de l’athlète.
+          {usesRpe && !assigned && ' Programme non attribué : le calcul se fera avec le 1RM de l’athlète au démarrage.'}
+          {usesRpe && assigned && !max && ' Aucun 1RM connu pour cet exercice.'}
+        </p>
+      )}
+    </fieldset>
   )
 }
 

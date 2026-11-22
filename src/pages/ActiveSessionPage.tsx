@@ -17,6 +17,7 @@ import { isBarbellExercise } from '../lib/plates'
 import { readRestEnd, writeRestEnd } from '../lib/restStorage'
 import { formatRpe, percentOf1RM, RPE_VALUES, rirFor } from '../lib/rpe'
 import { formatNumber } from '../lib/numbers'
+import { SET_KIND_LABELS } from '../lib/setPlan'
 
 export default function ActiveSessionPage() {
   const { profile } = useAuth()
@@ -123,6 +124,7 @@ function SessionRunner({ session }: { session: Session }) {
       rest_sec: last.rest_sec,
       specialty: last.specialty,
       target_rpe: last.target_rpe,
+      set_kind: last.set_kind === 'top' ? 'backoff' : last.set_kind,
     })
     if (error) setError(error.message)
     await sets.refetch()
@@ -210,8 +212,10 @@ function SessionRunner({ session }: { session: Session }) {
         const specialty = group[0].specialty
         const cardio = specialty === 'cardio'
         // RPE : cible et ressenti sur les exercices de force (ou dès qu'un RPE cible est fixé)
-        const withRpe = specialty === 'force' || group[0].target_rpe !== null
-        const targetRpe = group[0].target_rpe !== null ? Number(group[0].target_rpe) : null
+        const withRpe = specialty === 'force' || group.some((s) => s.target_rpe !== null)
+        // Cible de la prochaine série à faire (elle peut changer d'une série à l'autre)
+        const targetRpe = nextSet.target_rpe !== null ? Number(nextSet.target_rpe) : null
+        const varied = group.some((s) => s.set_kind !== 'normal' || Number(s.target_rpe) !== Number(group[0].target_rpe))
         const targetPercent = targetRpe !== null ? percentOf1RM(nextSet.reps, targetRpe) : null
         return (
           <section key={position} className="card exercise-block" aria-labelledby={headingId}>
@@ -223,7 +227,7 @@ function SessionRunner({ session }: { session: Session }) {
             {targetRpe !== null && (
               <p className="rpe-target">
                 <span className="rpe-target-value">RPE {formatRpe(targetRpe)}</span>
-                <span>cible, soit {formatRpe(rirFor(targetRpe))} rép. en réserve{targetPercent !== null ? ` · ${formatNumber(targetPercent)} % du 1RM` : ''}</span>
+                <span>{varied ? `cible de la série ${nextSet.set_number}` : 'cible'}, soit {formatRpe(rirFor(targetRpe))} rép. en réserve{targetPercent !== null ? ` · ${formatNumber(targetPercent)} % du 1RM` : ''}</span>
               </p>
             )}
             {!cardio && isBarbellExercise(exercise?.name) && <BarLoad weightKg={Number(nextSet.weight_kg)} />}
@@ -241,7 +245,7 @@ function SessionRunner({ session }: { session: Session }) {
               </thead>
               <tbody>
                 {group.map((set) => (
-                  <SetRow key={set.id} set={set} exerciseName={exercise?.name ?? ''} cardio={cardio} withRpe={withRpe}
+                  <SetRow key={set.id} set={set} exerciseName={exercise?.name ?? ''} cardio={cardio} withRpe={withRpe} showTarget={varied}
                     onUpdate={(patch) => updateSet(set.id, patch)}
                     onToggle={() => toggleDone(set)}
                     onRemove={() => removeSet(set)} />
@@ -306,12 +310,16 @@ interface SetRowProps {
   cardio: boolean
   /** Affiche la saisie du RPE ressenti */
   withRpe: boolean
+  /** Les séries diffèrent : on affiche le type et le RPE cible de chacune */
+  showTarget: boolean
   onUpdate: (patch: Partial<SessionSet>) => void
   onToggle: () => void
   onRemove: () => void
 }
 
-function SetRow({ set, exerciseName, cardio, withRpe, onUpdate, onToggle, onRemove }: SetRowProps) {
+const KIND_SHORT: Record<SessionSet['set_kind'], string> = { normal: '', warmup: 'Éch.', top: 'Top', backoff: 'B-off' }
+
+function SetRow({ set, exerciseName, cardio, withRpe, showTarget, onUpdate, onToggle, onRemove }: SetRowProps) {
   // État local pour que la case réagisse immédiatement, avant la réponse du serveur
   const [done, setDone] = useState(set.done)
   const [syncedDone, setSyncedDone] = useState(set.done)
@@ -342,7 +350,15 @@ function SetRow({ set, exerciseName, cardio, withRpe, onUpdate, onToggle, onRemo
   }
   return (
     <tr className={done ? 'done' : undefined}>
-      <th scope="row">{set.set_number}</th>
+      <th scope="row">
+        {set.set_number}
+        {showTarget && (
+          <span className="set-target">
+            {KIND_SHORT[set.set_kind] && <span title={SET_KIND_LABELS[set.set_kind]}>{KIND_SHORT[set.set_kind]}</span>}
+            {set.target_rpe !== null && <span>@{formatRpe(Number(set.target_rpe))}</span>}
+          </span>
+        )}
+      </th>
       <td>
         <input type="text" inputMode="decimal" enterKeyHint="next" aria-label={`Charge, ${label}`}
           defaultValue={String(Number(set.weight_kg)).replace('.', ',')}
