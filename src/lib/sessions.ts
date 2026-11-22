@@ -3,7 +3,7 @@ import { supabase, unwrap } from './supabase'
 import type { Session, SessionSet, Workout, WorkoutExercise } from './types'
 import { referenceMaxes } from './oneRepMax'
 import { plannedSets } from './setPlan'
-import { lastSessionSets, prefillWeight } from './lastSession'
+import { groupLastSession, prefillWeight, type LastSessionRow, type PreviousSession } from './lastSession'
 import { resolveMachine, type Link } from './machines'
 import type { Equipment } from './types'
 
@@ -91,4 +91,21 @@ async function loadMachines(exerciseIds: string[]) {
     supabase.from('exercise_equipment').select('*').in('exercise_id', exerciseIds),
   ])
   return { equipment: unwrap(equipment) as Equipment[], links: unwrap(links) as Link[] }
+}
+
+/** Séries de la dernière séance terminée de l'athlète, pour chaque exercice. */
+export async function lastSessionSets(athleteId: string, exerciseIds: string[]): Promise<Map<string, PreviousSession>> {
+  if (exerciseIds.length === 0) return new Map()
+  const rows = unwrap(
+    await supabase
+      .from('session_sets')
+      .select('exercise_id, session_id, set_number, weight_kg, reps, rpe, completed_at, sessions!inner(athlete_id, ended_at)')
+      .eq('sessions.athlete_id', athleteId)
+      .not('sessions.ended_at', 'is', null)
+      .eq('done', true)
+      .in('exercise_id', exerciseIds)
+      .order('completed_at', { ascending: false })
+      .limit(1000),
+  ) as LastSessionRow[]
+  return groupLastSession(rows)
 }

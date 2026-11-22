@@ -1,4 +1,3 @@
-import { supabase, unwrap } from './supabase'
 import { plannedSetLoad, type PlannedSet } from './setPlan'
 import type { ReferenceMax } from './oneRepMax'
 import type { Specialty } from './types'
@@ -17,7 +16,7 @@ export interface PreviousSession {
   sets: PreviousSet[]
 }
 
-interface Row {
+export interface LastSessionRow {
   exercise_id: string
   session_id: string
   set_number: number
@@ -28,7 +27,7 @@ interface Row {
 }
 
 /** Garde, pour chaque exercice, les séries de la séance la plus récente (rangées du plus récent au plus ancien). */
-export function groupLastSession(rows: Row[]): Map<string, PreviousSession> {
+export function groupLastSession(rows: LastSessionRow[]): Map<string, PreviousSession> {
   const result = new Map<string, PreviousSession>()
   for (const row of rows) {
     let entry = result.get(row.exercise_id)
@@ -41,23 +40,6 @@ export function groupLastSession(rows: Row[]): Map<string, PreviousSession> {
   }
   for (const entry of result.values()) entry.sets.sort((a, b) => a.set_number - b.set_number)
   return result
-}
-
-/** Séries de la dernière séance terminée de l'athlète, pour chaque exercice. */
-export async function lastSessionSets(athleteId: string, exerciseIds: string[]): Promise<Map<string, PreviousSession>> {
-  if (exerciseIds.length === 0) return new Map()
-  const rows = unwrap(
-    await supabase
-      .from('session_sets')
-      .select('exercise_id, session_id, set_number, weight_kg, reps, rpe, completed_at, sessions!inner(athlete_id, ended_at)')
-      .eq('sessions.athlete_id', athleteId)
-      .not('sessions.ended_at', 'is', null)
-      .eq('done', true)
-      .in('exercise_id', exerciseIds)
-      .order('completed_at', { ascending: false })
-      .limit(1000),
-  ) as Row[]
-  return groupLastSession(rows)
 }
 
 /** Série de la dernière fois qui correspond à la série n° index (la dernière faite s'il y en avait moins). */
