@@ -1,3 +1,5 @@
+import type { PlannedSet, SetKind } from './setPlan'
+
 export type AppRole = 'admin' | 'coach' | 'athlete'
 
 export type EquipmentKind =
@@ -115,6 +117,8 @@ export interface WorkoutExercise {
   specialty: Specialty
   /** RPE cible (6 à 10, par demi-points) */
   target_rpe: number | null
+  /** Réglage série par série ; null = séries identiques */
+  set_plan: PlannedSet[] | null
 }
 
 export interface Session {
@@ -142,6 +146,7 @@ export interface SessionSet {
   rpe: number | null
   target_rpe: number | null
   specialty: Specialty | null
+  set_kind: SetKind
   rest_sec: number
   done: boolean
   completed_at: string | null
