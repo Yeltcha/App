@@ -12,6 +12,7 @@ import { ConfirmDialog, Dialog } from '../components/Dialog'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
 import { RestTimer } from '../components/RestTimer'
 import { BarLoad } from '../components/BarLoad'
+import { ProgressRing } from '../components/ProgressRing'
 import { isBarbellExercise } from '../lib/plates'
 import { readRestEnd, writeRestEnd } from '../lib/restStorage'
 
@@ -185,9 +186,9 @@ function SessionRunner({ session }: { session: Session }) {
           <span>Commencée il y a {formatDuration(Date.parse(session.started_at), now)}</span>
         </p>
         <div className="session-progress">
-          <ol className="set-track" aria-hidden="true">
-            {(sets.data ?? []).map((s) => <li key={s.id} className={s.done ? 'done' : undefined} />)}
-          </ol>
+          <ProgressRing value={doneCount} max={total} size={52} label={`${doneCount} séries faites sur ${total}`}>
+            {doneCount}
+          </ProgressRing>
           <output aria-live="polite">{doneCount} sur {total} séries</output>
         </div>
       </header>

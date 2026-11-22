@@ -31,6 +31,11 @@ const STAFF_NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/athletes', label: 'Athlètes', icon: 'users' },
 ]
 
+function initials(name: string | undefined): string {
+  if (!name) return ''
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]!.toLocaleUpperCase('fr')).join('')
+}
+
 export function App() {
   const { session, loading, mustSetPassword, isStaff, profile } = useAuth()
 
@@ -55,7 +60,7 @@ export function App() {
             ))}
           </nav>
         )}
-        <span className="muted user-name">{profile?.full_name}</span>
+        <span className="user-name" role="img" title={profile?.full_name} aria-label={profile?.full_name}>{initials(profile?.full_name)}</span>
       </header>
 
       <main className="page" id="contenu">
@@ -82,9 +87,9 @@ export function App() {
 
       <nav aria-label="Navigation principale" className="tab-bar">
         {MAIN_NAV.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.to === '/'}>
+          <NavLink key={item.to} to={item.to} end={item.to === '/'} className={item.to === '/seance' ? 'tab-main' : undefined}>
             <Icon name={item.icon} />
-            <span>{item.label}</span>
+            <span className="visually-hidden">{item.label}</span>
           </NavLink>
         ))}
       </nav>
