@@ -117,6 +117,7 @@ function SessionRunner({ session }: { session: Session }) {
       session_id: session.id,
       exercise_id: last.exercise_id,
       equipment_id: last.equipment_id,
+      equipment_brand: last.equipment_brand,
       exercise_position: last.exercise_position,
       set_number: last.set_number + 1,
       reps: last.reps,
@@ -221,7 +222,8 @@ function SessionRunner({ session }: { session: Session }) {
           <section key={position} className="card exercise-block" aria-labelledby={headingId}>
             <h2 id={headingId}><span className="station" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>{exercise?.name ?? 'Exercice'}</h2>
             <p className="muted small exercise-meta">
-              {eq && <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>}
+              {eq ? <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>
+                : group[0].equipment_brand && <span>Marque : {group[0].equipment_brand}</span>}
               <span>{prev ? `Dernière fois : ${formatKg(prev.weight_kg)} × ${prev.reps}` : 'Première fois sur cet exercice'}</span>
             </p>
             {targetRpe !== null && (

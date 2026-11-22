@@ -8,6 +8,7 @@ import { formatKg, formatNumber, parseDecimal } from '../lib/numbers'
 import { plannedRpeLoad, referenceMaxes, type ReferenceMax } from '../lib/oneRepMax'
 import { formatRpe, RPE_VALUES, rirFor } from '../lib/rpe'
 import { formatShortDate } from '../lib/dates'
+import { brandsOf, machinesFor } from '../lib/machines'
 import { describeSet, plannedSetLoad, plannedSets, rampRpe, SET_KIND_LABELS, SET_KINDS, type PlannedSet, type SetKind } from '../lib/setPlan'
 import { RpeTable } from '../components/RpeTable'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
@@ -277,7 +278,10 @@ function PlanRow({ item, index, count, max, onEdit, onMove, onDelete }: {
   onEdit: () => void; onMove: (d: -1 | 1) => void; onDelete: () => void
 }) {
   const exercises = byId(useGymExercises(null).data)
+  const equipment = byId(useEquipment().data)
   const name = exercises.get(item.exercise_id)?.name ?? 'Exercice'
+  const machine = item.equipment_id ? equipment.get(item.equipment_id) : undefined
+  const machineText = machine ? `${machine.name}${machine.brand ? ` (${machine.brand})` : ''}` : item.equipment_brand ?? ''
   const sets = plannedSets(item)
   const varied = item.set_plan !== null
   const first = sets[0]
@@ -292,6 +296,7 @@ function PlanRow({ item, index, count, max, onEdit, onMove, onDelete }: {
           <span className={`specialty-tag ${item.specialty}`}>{SPECIALTY_LABELS[item.specialty]}</span>
           {summary}, repos {item.rest_sec} s
         </span>
+        {machineText && <span className="muted small machine-line">{machineText}</span>}
         {varied && (
           <ol className="plan-sets small">
             {sets.map((set, i) => (
@@ -348,9 +353,18 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
   const max = maxes?.get(exerciseId)
   const rpeLoad = targetRpe !== null ? plannedRpeLoad({ specialty, target_rpe: targetRpe, rep_min: Number(repMin) }, max) : null
 
-  const linkedEquipment = (equipment.data ?? []).filter((eq) =>
-    links.data?.some((l) => l.exercise_id === exerciseId && l.equipment_id === eq.id) &&
-    (!workout.gym_id || eq.gym_id === workout.gym_id))
+  const gyms = useGyms()
+  const [brand, setBrand] = useState(item?.equipment_brand ?? '')
+  const [equipmentId, setEquipmentId] = useState(item?.equipment_id ?? '')
+  const allEquipment = equipment.data ?? []
+  const allLinks = links.data ?? []
+  const exercise = exercises.data?.find((x) => x.id === exerciseId)
+  // Machines de l'exercice dans la salle de la séance (toutes les salles si elle n'en a pas)
+  const inGym = machinesFor(exerciseId, allEquipment, allLinks, { gymId: workout.gym_id })
+  const machineOptions = machinesFor(exerciseId, allEquipment, allLinks, { gymId: workout.gym_id, brand })
+  const showMachine = Boolean(exerciseId) && (exercise?.requires_equipment || inGym.length > 0
+    || machinesFor(exerciseId, allEquipment, allLinks).length > 0 || Boolean(brand))
+  const gymName = (id: string) => gyms.data?.find((g) => g.id === id)?.name ?? ''
 
   const commonRow = (): RowState => ({ kind: 'normal', repMin, repMax, rpe, weight: weightText })
 
@@ -414,7 +428,8 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
     const values = {
       workout_id: workout.id,
       exercise_id: String(f.get('exercise')),
-      equipment_id: String(f.get('equipment') ?? '') || null,
+      equipment_id: showMachine && equipmentId ? equipmentId : null,
+      equipment_brand: showMachine ? brand.trim() || null : null,
       specialty,
       target_sets: plan ? plan.length : Number(setCount),
       rep_min: first.rep_min,
@@ -442,14 +457,48 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
         </select>
         {workout.gym_id && <span className="hint">Liste limitée aux exercices disponibles dans la salle de cette séance.</span>}
       </div>
-      {linkedEquipment.length > 0 && (
-        <div className="field">
-          <label htmlFor="pf-eq">Machine</label>
-          <select id="pf-eq" name="equipment" defaultValue={item?.equipment_id ?? ''}>
-            <option value="">Indifférent</option>
-            {linkedEquipment.map((eq) => <option key={eq.id} value={eq.id}>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</option>)}
-          </select>
-        </div>
+      {showMachine && (
+        <fieldset className="stack-sm equipment-fields">
+          <legend>Équipement</legend>
+          <p className="hint">
+            Salle : {workout.gym_id ? gymName(workout.gym_id) : 'toutes les salles'} (elle se règle sur la séance).
+            Indique une marque, une machine précise, ou les deux.
+          </p>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="pf-brand">Marque (facultatif)</label>
+              <input id="pf-brand" list="pf-brands" value={brand} autoComplete="off" maxLength={60}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setBrand(value)
+                  const current = allEquipment.find((eq) => eq.id === equipmentId)
+                  if (current && value.trim() && current.brand?.toLocaleLowerCase('fr') !== value.trim().toLocaleLowerCase('fr')) setEquipmentId('')
+                }} />
+              <datalist id="pf-brands">
+                {brandsOf(inGym.length ? inGym : allEquipment).map((b) => <option key={b} value={b} />)}
+              </datalist>
+            </div>
+            <div className="field">
+              <label htmlFor="pf-eq">Machine</label>
+              <select id="pf-eq" value={equipmentId}
+                onChange={(e) => {
+                  setEquipmentId(e.target.value)
+                  const picked = allEquipment.find((eq) => eq.id === e.target.value)
+                  if (picked?.brand) setBrand(picked.brand)
+                }}>
+                <option value="">Indifférente</option>
+                {machineOptions.map((eq) => (
+                  <option key={eq.id} value={eq.id}>
+                    {eq.name}{eq.brand ? ` (${eq.brand})` : ''}{workout.gym_id ? '' : ` · ${gymName(eq.gym_id)}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {brand.trim() && machineOptions.length === 0 && (
+            <p className="hint">Aucune machine {brand.trim()} enregistrée pour cet exercice{workout.gym_id ? ' dans cette salle' : ''} : la marque sera indiquée à l’athlète.</p>
+          )}
+        </fieldset>
       )}
       <fieldset className="segmented">
         <legend>Spécialité</legend>
