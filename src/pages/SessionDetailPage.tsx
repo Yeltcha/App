@@ -8,6 +8,7 @@ import { formatDuration, formatLongDate, localDateOf } from '../lib/dates'
 import { estimate1RM, formatKg } from '../lib/numbers'
 import { formatRpe } from '../lib/rpe'
 import { SET_KIND_LABELS } from '../lib/setPlan'
+import { sessionSupersets, slotLabel } from '../lib/superset'
 import { ConfirmDialog } from '../components/Dialog'
 import { ErrorMessage, Loading } from '../components/Feedback'
 
@@ -65,13 +66,14 @@ export default function SessionDetailPage() {
       </header>
       <ErrorMessage error={error} />
 
-      {[...groups.entries()].map(([pos, group]) => {
+      {[...groups.entries()].map(([pos, group], _i, all) => {
+        const slot = sessionSupersets(all.map(([position, g]) => ({ position, group: g[0].superset_group }))).get(pos)
         const ex = exercises.get(group[0].exercise_id)
         const eq = group[0].equipment_id ? equipment.get(group[0].equipment_id) : undefined
         const best = Math.max(...group.map((s) => estimate1RM(Number(s.weight_kg), s.reps) ?? 0))
         return (
           <section key={pos} className="card" aria-labelledby={`d-${pos}`}>
-            <h2 id={`d-${pos}`}>{ex?.name}</h2>
+            <h2 id={`d-${pos}`}>{slot && <span className="superset-tag" title={`Superset ${slot.letter}`}>{slotLabel(slot)}</span>}{ex?.name}</h2>
             {eq && <p className="muted small">{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</p>}
             <ol className="set-summary">
               {group.map((s) => (

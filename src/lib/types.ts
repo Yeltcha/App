@@ -129,6 +129,8 @@ export interface WorkoutExercise {
   target_rpe: number | null
   /** Réglage série par série ; null = séries identiques */
   set_plan: PlannedSet[] | null
+  /** Enchaîné en superset avec l'exercice précédent */
+  superset_with_previous: boolean
 }
 
 export interface Session {
@@ -157,6 +159,8 @@ export interface SessionSet {
   target_rpe: number | null
   specialty: Specialty | null
   set_kind: SetKind
+  /** Superset : même numéro pour les exercices enchaînés ; null = exercice seul */
+  superset_group: number | null
   rest_sec: number
   done: boolean
   completed_at: string | null

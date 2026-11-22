@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { Fragment, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, unwrap } from '../lib/supabase'
@@ -9,6 +9,7 @@ import { plannedRpeLoad, referenceMaxes, type ReferenceMax } from '../lib/oneRep
 import { formatRpe, RPE_VALUES, rirFor } from '../lib/rpe'
 import { formatShortDate } from '../lib/dates'
 import { exerciseChoices } from '../lib/machines'
+import { restsAfter, slotLabel, supersetSlots, type SupersetSlot } from '../lib/superset'
 import { describeSet, plannedSetLoad, plannedSets, rampRpe, SET_KIND_LABELS, SET_KINDS, type PlannedSet, type SetKind } from '../lib/setPlan'
 import { RpeTable } from '../components/RpeTable'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
@@ -25,6 +26,7 @@ export default function ProgramEditPage() {
   const queryClient = useQueryClient()
   const profiles = useProfiles()
   const gyms = useGyms()
+  const exerciseNames = byId(useExercises().data)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState('')
   const [addingWorkout, setAddingWorkout] = useState(false)
@@ -102,6 +104,29 @@ export default function ProgramEditPage() {
       item.position === i ? null : supabase.from(table).update({ position: i }).eq('id', item.id)))
     const failed = results.find((r) => r?.error)
     setError(failed?.error ? failed.error.message : null)
+    await refresh()
+  }
+
+  async function toggleSuperset(item: WorkoutExercise) {
+    if (await check(supabase.from('workout_exercises').update({ superset_with_previous: !item.superset_with_previous }).eq('id', item.id))) await refresh()
+  }
+
+  // Déplacer un exercice défait les supersets autour de lui (à relier ensuite)
+  async function moveExercise(list: WorkoutExercise[], index: number, delta: -1 | 1) {
+    const first = Math.min(index, index + delta)
+    const touched = [list[first], list[first + 1], list[first + 2]].filter((x): x is WorkoutExercise => Boolean(x?.superset_with_previous))
+    if (touched.length && !(await check(supabase.from('workout_exercises').update({ superset_with_previous: false }).in('id', touched.map((x) => x.id))))) return
+    await swap('workout_exercises', list, index, delta)
+  }
+
+  // Retirer le premier exercice d'un superset : le suivant devient le début du groupe
+  async function deleteExercise(list: WorkoutExercise[], index: number) {
+    const item = list[index]
+    const next = list[index + 1]
+    if (!(await check(supabase.from('workout_exercises').delete().eq('id', item.id)))) return
+    if (next?.superset_with_previous && !item.superset_with_previous) {
+      await check(supabase.from('workout_exercises').update({ superset_with_previous: false }).eq('id', next.id))
+    }
     await refresh()
   }
 
@@ -193,13 +218,30 @@ export default function ProgramEditPage() {
               <WorkoutGymField workout={w} gyms={gyms.data ?? []} onSaved={refresh} />
               {w.exercises.length === 0 ? <p className="muted small">Aucun exercice.</p> : (
                 <ol className="plain-list exercise-plan">
-                  {w.exercises.map((we, ei) => (
-                    <PlanRow key={we.id} item={we} index={ei} count={w.exercises.length} max={maxes.data?.get(we.exercise_id)}
-                      onEdit={() => setEditingExercise({ workout: w, item: we })}
-                      onMove={(d) => swap('workout_exercises', w.exercises, ei, d)}
-                      onDelete={async () => { if (await check(supabase.from('workout_exercises').delete().eq('id', we.id))) await refresh() }} />
-                  ))}
+                  {(() => {
+                    const slots = supersetSlots(w.exercises)
+                    return w.exercises.map((we, ei) => (
+                      <Fragment key={we.id}>
+                        {ei > 0 && (
+                          <li className="superset-link">
+                            <button type="button" aria-pressed={we.superset_with_previous}
+                              aria-label={`Superset ${exerciseNames.get(w.exercises[ei - 1].exercise_id)?.name ?? ''} et ${exerciseNames.get(we.exercise_id)?.name ?? ''}`}
+                              onClick={() => toggleSuperset(we)}>
+                              {we.superset_with_previous ? 'Superset ✓' : '+ Superset'}
+                            </button>
+                          </li>
+                        )}
+                        <PlanRow item={we} index={ei} count={w.exercises.length} max={maxes.data?.get(we.exercise_id)} slot={slots[ei]}
+                          onEdit={() => setEditingExercise({ workout: w, item: we })}
+                          onMove={(d) => moveExercise(w.exercises, ei, d)}
+                          onDelete={() => deleteExercise(w.exercises, ei)} />
+                      </Fragment>
+                    ))
+                  })()}
                 </ol>
+              )}
+              {w.exercises.length > 1 && (
+                <p className="hint">« + Superset » enchaîne deux exercices sans repos entre eux ; le repos du dernier exercice s’applique après chaque tour.</p>
               )}
               <button type="button" onClick={() => setEditingExercise({ workout: w, item: null })}>+ Ajouter un exercice</button>
             </li>
@@ -273,8 +315,9 @@ function WorkoutGymField({ workout, gyms, onSaved }: { workout: Workout; gyms: {
   )
 }
 
-function PlanRow({ item, index, count, max, onEdit, onMove, onDelete }: {
+function PlanRow({ item, index, count, max, slot, onEdit, onMove, onDelete }: {
   item: WorkoutExercise; index: number; count: number; max: ReferenceMax | undefined
+  slot: SupersetSlot | null
   onEdit: () => void; onMove: (d: -1 | 1) => void; onDelete: () => void
 }) {
   const exercises = byId(useGymExercises(null).data)
@@ -289,12 +332,12 @@ function PlanRow({ item, index, count, max, onEdit, onMove, onDelete }: {
     ? `${sets.length} ${item.specialty === 'cardio' ? 'blocs' : 'séries'} réglées une par une`
     : `${item.target_sets} × ${describeSet(first, item.specialty, plannedSetLoad(first, item.specialty, max))}`
   return (
-    <li className="row between wrap plan-row">
+    <li className={slot ? 'row between wrap plan-row in-superset' : 'row between wrap plan-row'}>
       <span className="item-text">
-        <strong>{name}</strong>
+        <strong>{slot && <span className="superset-tag" title={`Superset ${slot.letter}`}>{slotLabel(slot)}</span>}{name}</strong>
         <span className="muted small">
           <span className={`specialty-tag ${item.specialty}`}>{SPECIALTY_LABELS[item.specialty]}</span>
-          {summary}, repos {item.rest_sec} s
+          {summary}, {!restsAfter(slot) ? 'enchaîner sans repos' : `repos ${item.rest_sec} s${slot ? ' après le superset' : ''}`}
         </span>
         {machineText && <span className="muted small machine-line">{machineText}</span>}
         {varied && (
