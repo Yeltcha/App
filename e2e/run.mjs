@@ -307,6 +307,12 @@ try {
   await coach.getByRole('dialog').getByRole('button', { name: 'Enregistrer' }).click()
   await haut.getByText('Technogym', { exact: true }).waitFor()
   assert(true, 'la marque est enregistrée sur l’exercice')
+  // Exercice de bodybuilding sans charge fixée : la séance reprendra la dernière performance
+  await haut.getByRole('button', { name: '+ Ajouter un exercice' }).click()
+  await coach.getByLabel('Exercice').selectOption({ label: 'Curl marteau' })
+  await coach.getByLabel('Répétitions min.').fill('10')
+  await coach.getByRole('dialog').getByRole('button', { name: 'Enregistrer' }).click()
+  await haut.getByText('Curl marteau').waitFor()
 
   step('L’athlète retrouve chaque série dans sa séance')
   await athlete.goto(APP)
@@ -322,6 +328,12 @@ try {
   assert(true, 'le RPE cible suit la prochaine série')
   await athlete.getByText('Pec deck (Technogym)').waitFor()
   assert(true, 'la machine Technogym de la salle est retrouvée à partir de la marque')
+  await athlete.getByText(/Dernière fois \(.+\) : 14 × 10/).waitFor()
+  assert(await athlete.getByLabel('Charge, Curl marteau, série 1').inputValue() === '14', 'bodybuilding : charge de la dernière fois préremplie')
+  assert(await athlete.getByLabel('Charge, Curl marteau, série 3').inputValue() === '14', 'une série de plus qu’avant reprend la dernière charge faite')
+  await athlete.getByLabel('Charge, Curl marteau, série 1').fill('15')
+  await athlete.getByLabel('Charge, Curl marteau, série 1').blur()
+  assert(await athlete.getByLabel('Charge, Curl marteau, série 1').inputValue() === '15', 'la charge préremplie reste modifiable')
   await athlete.getByRole('button', { name: 'Passer' }).click()
   await shot(athlete, '12-seance-series')
 

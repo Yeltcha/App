@@ -914,3 +914,8 @@ progress { inline-size: 100%; accent-color: var(--cuivre); }
 .equipment-fields { border: 0; padding: 0; margin: 0; }
 .equipment-fields legend { padding: 0 0 0.4rem; font-size: var(--step--1); color: var(--texte-2); }
 .machine-line { display: block; }
+
+/* La même série la dernière fois, sous la charge */
+.sets-table .set-before { display: block; margin-block-start: 0.15rem; font-size: 0.68rem; color: var(--texte-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sets-table tbody td, .sets-table tbody th { vertical-align: top; }
+.sets-table tbody th { padding-block-start: 0.85rem; }

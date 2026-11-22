@@ -4,9 +4,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
 import { supabase, unwrap } from '../lib/supabase'
 import { byId, useEquipment, useExercises, useGymExercises, useGyms } from '../lib/queries'
-import { ACTIVE_SESSION_KEY, lastPerformances, useActiveSession } from '../lib/sessions'
+import { ACTIVE_SESSION_KEY, lastSessionSets, useActiveSession } from '../lib/sessions'
+import type { PreviousSet } from '../lib/lastSession'
+import { formatShortDate } from '../lib/dates'
 import { MUSCLE_LABELS, type Exercise, type Session, type SessionSet } from '../lib/types'
-import { formatKg, parseDecimal } from '../lib/numbers'
+import { parseDecimal } from '../lib/numbers'
 import { formatDuration } from '../lib/dates'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
@@ -77,9 +79,9 @@ function SessionRunner({ session }: { session: Session }) {
     [sets.data],
   )
   const previous = useQuery({
-    queryKey: ['last-perf', session.athlete_id, exerciseIds],
+    queryKey: ['last-session', session.athlete_id, exerciseIds],
     enabled: exerciseIds.length > 0,
-    queryFn: () => lastPerformances(session.athlete_id, exerciseIds),
+    queryFn: () => lastSessionSets(session.athlete_id, exerciseIds),
   })
 
   const groups = useMemo(() => {
@@ -113,6 +115,8 @@ function SessionRunner({ session }: { session: Session }) {
 
   async function addSet(group: SessionSet[]) {
     const last = group.at(-1)!
+    // La même série la dernière fois, si elle existe ; sinon on recopie la série précédente
+    const before = previous.data?.get(last.exercise_id)?.sets[last.set_number]
     const { error } = await supabase.from('session_sets').insert({
       session_id: session.id,
       exercise_id: last.exercise_id,
@@ -120,8 +124,8 @@ function SessionRunner({ session }: { session: Session }) {
       equipment_brand: last.equipment_brand,
       exercise_position: last.exercise_position,
       set_number: last.set_number + 1,
-      reps: last.reps,
-      weight_kg: last.weight_kg,
+      reps: before?.reps ?? last.reps,
+      weight_kg: before?.weight_kg ?? last.weight_kg,
       rest_sec: last.rest_sec,
       specialty: last.specialty,
       target_rpe: last.target_rpe,
@@ -140,16 +144,18 @@ function SessionRunner({ session }: { session: Session }) {
   async function addExercise(exercise: Exercise) {
     setPicking(false)
     const position = groups.length ? groups[groups.length - 1][0] + 1 : 0
-    const last = (await lastPerformances(session.athlete_id, [exercise.id])).get(exercise.id)
-    const { error } = await supabase.from('session_sets').insert({
+    // On reprend les séries de la dernière fois (charges et répétitions), modifiables
+    const before = (await lastSessionSets(session.athlete_id, [exercise.id])).get(exercise.id)?.sets
+    const model = before?.length ? before : [{ reps: 10, weight_kg: 0 }]
+    const { error } = await supabase.from('session_sets').insert(model.map((s, i) => ({
       session_id: session.id,
       exercise_id: exercise.id,
       exercise_position: position,
-      set_number: 1,
-      reps: last?.reps ?? 10,
-      weight_kg: last?.weight_kg ?? 0,
+      set_number: i + 1,
+      reps: s.reps,
+      weight_kg: s.weight_kg,
       rest_sec: 90,
-    })
+    })))
     if (error) setError(error.message)
     await sets.refetch()
   }
@@ -224,7 +230,9 @@ function SessionRunner({ session }: { session: Session }) {
             <p className="muted small exercise-meta">
               {eq ? <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>
                 : group[0].equipment_brand && <span>Marque : {group[0].equipment_brand}</span>}
-              <span>{prev ? `Dernière fois : ${formatKg(prev.weight_kg)} × ${prev.reps}` : 'Première fois sur cet exercice'}</span>
+              <span>{prev?.sets.length
+                ? `Dernière fois${prev.date ? ` (${formatShortDate(prev.date)})` : ''} : ${prev.sets.map((p) => `${formatNumber(p.weight_kg)} × ${p.reps}`).join(' · ')}`
+                : 'Première fois sur cet exercice'}</span>
             </p>
             {targetRpe !== null && (
               <p className="rpe-target">
@@ -248,6 +256,7 @@ function SessionRunner({ session }: { session: Session }) {
               <tbody>
                 {group.map((set) => (
                   <SetRow key={set.id} set={set} exerciseName={exercise?.name ?? ''} cardio={cardio} withRpe={withRpe} showTarget={varied}
+                    before={prev?.sets[set.set_number - 1]}
                     onUpdate={(patch) => updateSet(set.id, patch)}
                     onToggle={() => toggleDone(set)}
                     onRemove={() => removeSet(set)} />
@@ -314,6 +323,8 @@ interface SetRowProps {
   withRpe: boolean
   /** Les séries diffèrent : on affiche le type et le RPE cible de chacune */
   showTarget: boolean
+  /** La même série lors de la dernière séance */
+  before: PreviousSet | undefined
   onUpdate: (patch: Partial<SessionSet>) => void
   onToggle: () => void
   onRemove: () => void
@@ -321,7 +332,7 @@ interface SetRowProps {
 
 const KIND_SHORT: Record<SessionSet['set_kind'], string> = { normal: '', warmup: 'Éch.', top: 'Top', backoff: 'B-off' }
 
-function SetRow({ set, exerciseName, cardio, withRpe, showTarget, onUpdate, onToggle, onRemove }: SetRowProps) {
+function SetRow({ set, exerciseName, cardio, withRpe, showTarget, before, onUpdate, onToggle, onRemove }: SetRowProps) {
   // État local pour que la case réagisse immédiatement, avant la réponse du serveur
   const [done, setDone] = useState(set.done)
   const [syncedDone, setSyncedDone] = useState(set.done)
@@ -366,6 +377,11 @@ function SetRow({ set, exerciseName, cardio, withRpe, showTarget, onUpdate, onTo
           defaultValue={String(Number(set.weight_kg)).replace('.', ',')}
           onInput={(e) => e.currentTarget.setCustomValidity('')}
           onBlur={(e) => commitWeight(e.currentTarget)} />
+        {before && !cardio && (
+          <span className="set-before" title="La même série, la dernière fois">
+            <span className="visually-hidden">La dernière fois : </span>{formatNumber(before.weight_kg)} × {before.reps}
+          </span>
+        )}
       </td>
       <td>
         <input type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="done" aria-label={`${cardio ? 'Minutes' : 'Répétitions'}, ${label}`}
