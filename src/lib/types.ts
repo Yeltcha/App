@@ -107,6 +107,8 @@ export interface WorkoutExercise {
   workout_id: string
   exercise_id: string
   equipment_id: string | null
+  /** Marque de machine visée (facultatif, indépendant de la machine précise) */
+  equipment_brand: string | null
   position: number
   target_sets: number
   rep_min: number
@@ -138,6 +140,7 @@ export interface SessionSet {
   session_id: string
   exercise_id: string
   equipment_id: string | null
+  equipment_brand: string | null
   exercise_position: number
   set_number: number
   reps: number

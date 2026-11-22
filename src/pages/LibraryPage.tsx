@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { useEquipment, useExerciseEquipment, useExercises, useGyms } from '../lib/queries'
+import { byId, useEquipment, useExerciseEquipment, useExercises, useGyms } from '../lib/queries'
+import { machinesFor } from '../lib/machines'
 import {
   EQUIPMENT_LABELS, MUSCLE_LABELS,
   type Equipment, type EquipmentKind, type Exercise, type Gym, type MuscleGroup,
@@ -37,6 +38,9 @@ export default function LibraryPage() {
 
 function ExercisesSection() {
   const exercises = useExercises()
+  const equipment = useEquipment()
+  const links = useExerciseEquipment()
+  const gyms = byId(useGyms().data)
   const [editing, setEditing] = useState<Exercise | 'new' | null>(null)
   const [deleting, setDeleting] = useState<Exercise | null>(null)
   const [error, setError] = useState<unknown>(null)
@@ -73,6 +77,7 @@ function ExercisesSection() {
             <span className="item-text">
               <strong>{ex.name}</strong>
               <span className="muted small">{MUSCLE_LABELS[ex.muscle_group]}{ex.requires_equipment ? ', machine requise' : ''}</span>
+              <MachineList machines={machinesFor(ex.id, equipment.data ?? [], links.data ?? [])} gymName={(id) => gyms.get(id)?.name ?? ''} />
             </span>
             <span className="row">
               <button type="button" onClick={() => setEditing(ex)}>Modifier</button>
@@ -87,6 +92,22 @@ function ExercisesSection() {
       <ConfirmDialog open={deleting !== null} title="Supprimer l’exercice ?" message={`« ${deleting?.name} » sera retiré de la bibliothèque.`}
         confirmLabel="Supprimer" onConfirm={() => deleting && remove(deleting)} onCancel={() => setDeleting(null)} />
     </section>
+  )
+}
+
+/** Machines d'un exercice : nom, marque et salle. */
+function MachineList({ machines, gymName }: { machines: Equipment[]; gymName: (id: string) => string }) {
+  if (machines.length === 0) return null
+  return (
+    <ul className="plain-list machine-list" aria-label="Machines associées">
+      {machines.map((eq) => (
+        <li key={eq.id}>
+          <span className="machine-brand">{eq.brand ?? 'Sans marque'}</span>
+          <span>{eq.name}</span>
+          <span className="muted">{gymName(eq.gym_id)}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
