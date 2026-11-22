@@ -17,6 +17,7 @@ import { BarLoad } from '../components/BarLoad'
 import { ProgressRing } from '../components/ProgressRing'
 import { isBarbellExercise } from '../lib/plates'
 import { readRestEnd, writeRestEnd } from '../lib/restStorage'
+import { restsAfter, sessionSupersets, slotLabel } from '../lib/superset'
 import { formatRpe, percentOf1RM, RPE_VALUES, rirFor } from '../lib/rpe'
 import { formatNumber } from '../lib/numbers'
 import { SET_KIND_LABELS } from '../lib/setPlan'
@@ -93,6 +94,10 @@ function SessionRunner({ session }: { session: Session }) {
     }
     return [...map.entries()].sort((a, b) => a[0] - b[0])
   }, [sets.data])
+  const supersets = useMemo(
+    () => sessionSupersets(groups.map(([position, group]) => ({ position, group: group[0].superset_group }))),
+    [groups],
+  )
 
   function patchLocal(id: string, patch: Partial<SessionSet>) {
     queryClient.setQueryData<SessionSet[]>(setsKey, (old) => old?.map((s) => (s.id === id ? { ...s, ...patch } : s)))
@@ -110,7 +115,8 @@ function SessionRunner({ session }: { session: Session }) {
   async function toggleDone(set: SessionSet) {
     const done = !set.done
     await updateSet(set.id, { done, completed_at: done ? new Date().toISOString() : null })
-    if (done && set.rest_sec > 0) setRestEndsAt(Date.now() + set.rest_sec * 1000)
+    // Superset : on enchaîne l'exercice suivant sans repos
+    if (done && set.rest_sec > 0 && restsAfter(supersets.get(set.exercise_position))) setRestEndsAt(Date.now() + set.rest_sec * 1000)
   }
 
   async function addSet(group: SessionSet[]) {
@@ -129,6 +135,7 @@ function SessionRunner({ session }: { session: Session }) {
       specialty: last.specialty,
       target_rpe: last.target_rpe,
       set_kind: last.set_kind === 'top' ? 'backoff' : last.set_kind,
+      superset_group: last.superset_group,
     })
     if (error) setError(error.message)
     await sets.refetch()
@@ -223,9 +230,23 @@ function SessionRunner({ session }: { session: Session }) {
         const targetRpe = nextSet.target_rpe !== null ? Number(nextSet.target_rpe) : null
         const varied = group.some((s) => s.set_kind !== 'normal' || Number(s.target_rpe) !== Number(group[0].target_rpe))
         const targetPercent = targetRpe !== null ? percentOf1RM(nextSet.reps, targetRpe) : null
+        const slot = supersets.get(position)
+        const nextInSuperset = slot && slot.order < slot.size ? groups[index + 1] : undefined
+        const supersetClass = slot ? ` in-superset${slot.order === 1 ? ' superset-first' : ''}${slot.order === slot.size ? ' superset-last' : ''}` : ''
         return (
-          <section key={position} className="card exercise-block" aria-labelledby={headingId}>
-            <h2 id={headingId}><span className="station" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>{exercise?.name ?? 'Exercice'}</h2>
+          <section key={position} className={`card exercise-block${supersetClass}`} aria-labelledby={headingId}>
+            <h2 id={headingId}>
+              <span className="station" aria-hidden="true">{slot ? slotLabel(slot) : String(index + 1).padStart(2, '0')}</span>
+              {exercise?.name ?? 'Exercice'}
+            </h2>
+            {slot && (
+              <p className="superset-note">
+                <span className="superset-tag">Superset {slot.letter}</span>
+                {nextInSuperset
+                  ? `Enchaîne avec ${exerciseMap.get(nextInSuperset[1][0].exercise_id)?.name ?? 'l’exercice suivant'}, sans repos`
+                  : `Repos ${group[0].rest_sec} s après cette série, puis retour à ${exerciseMap.get(groups.find(([p]) => p === slot.group)?.[1][0].exercise_id ?? '')?.name ?? 'au premier exercice'}`}
+              </p>
+            )}
             <p className="muted small exercise-meta">
               {eq && <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>}
               <span>{prev?.sets.length

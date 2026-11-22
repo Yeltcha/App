@@ -5,6 +5,7 @@ import { referenceMaxes } from './oneRepMax'
 import { plannedSets } from './setPlan'
 import { groupLastSession, prefillWeight, type LastSessionRow, type PreviousSession } from './lastSession'
 import { resolveMachine, type Link } from './machines'
+import { supersetSlots } from './superset'
 import type { Equipment } from './types'
 
 export const ACTIVE_SESSION_KEY = ['active-session'] as const
@@ -63,6 +64,7 @@ export async function startSession({ athleteId, gymId, workout }: StartOptions):
     const machineFor = (p: WorkoutExercise) => needsMachines
       ? resolveMachine({ exerciseId: p.exercise_id, equipmentId: p.equipment_id }, gymId, machines.equipment, machines.links)
       : null
+    const slots = supersetSlots(planned)
     const sets: Partial<SessionSet>[] = planned.flatMap((p, index) =>
       plannedSets(p).map((planned, i) => ({
         session_id: session.id,
@@ -77,6 +79,7 @@ export async function startSession({ athleteId, gymId, workout }: StartOptions):
         specialty: p.specialty,
         target_rpe: p.specialty === 'cardio' ? null : planned.target_rpe,
         set_kind: planned.kind,
+        superset_group: slots[index]?.group ?? null,
       })),
     )
     if (sets.length > 0) unwrap(await supabase.from('session_sets').insert(sets))
