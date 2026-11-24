@@ -9,6 +9,8 @@ import { estimate1RM, formatKg } from '../lib/numbers'
 import { formatRpe } from '../lib/rpe'
 import { SET_KIND_LABELS } from '../lib/setPlan'
 import { sessionSupersets, slotLabel } from '../lib/superset'
+import { groupByExercise } from '../lib/sessionSets'
+import { machineLabel } from '../lib/machines'
 import { ConfirmDialog } from '../components/Dialog'
 import { ErrorMessage, Loading } from '../components/Feedback'
 
@@ -36,8 +38,8 @@ export default function SessionDetailPage() {
   if (data.error) return <ErrorMessage error={data.error} />
   const { session, sets } = data.data
 
-  const groups = new Map<number, SessionSet[]>()
-  for (const s of sets) groups.set(s.exercise_position, [...(groups.get(s.exercise_position) ?? []), s])
+  const groups = groupByExercise(sets)
+  const supersets = sessionSupersets(groups.map(([position, g]) => ({ position, group: g[0].superset_group })))
 
   async function remove() {
     setConfirming(false)
@@ -66,15 +68,15 @@ export default function SessionDetailPage() {
       </header>
       <ErrorMessage error={error} />
 
-      {[...groups.entries()].map(([pos, group], _i, all) => {
-        const slot = sessionSupersets(all.map(([position, g]) => ({ position, group: g[0].superset_group }))).get(pos)
+      {groups.map(([pos, group]) => {
+        const slot = supersets.get(pos)
         const ex = exercises.get(group[0].exercise_id)
         const eq = group[0].equipment_id ? equipment.get(group[0].equipment_id) : undefined
         const best = Math.max(...group.map((s) => estimate1RM(Number(s.weight_kg), s.reps) ?? 0))
         return (
           <section key={pos} className="card" aria-labelledby={`d-${pos}`}>
             <h2 id={`d-${pos}`}>{slot && <span className="superset-tag" title={`Superset ${slot.letter}`}>{slotLabel(slot)}</span>}{ex?.name}</h2>
-            {eq && <p className="muted small">{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</p>}
+            {eq && <p className="muted small">{machineLabel(eq)}</p>}
             <ol className="set-summary">
               {group.map((s) => (
                 <li key={s.id}>

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { byId, useEquipment, useExerciseEquipment, useExercises, useGymBrands, useGyms } from '../lib/queries'
-import { machinesFor } from '../lib/machines'
+import { machinesFor, matchesExercise } from '../lib/machines'
 import {
   EQUIPMENT_LABELS, MUSCLE_LABELS,
   type Equipment, type EquipmentKind, type Exercise, type Gym, type GymBrand, type MuscleGroup,
@@ -48,9 +48,7 @@ function ExercisesSection() {
   const queryClient = useQueryClient()
 
   const q = filter.trim().toLocaleLowerCase('fr')
-  const list = (exercises.data ?? []).filter(
-    (e) => !q || e.name.toLocaleLowerCase('fr').includes(q) || MUSCLE_LABELS[e.muscle_group].toLocaleLowerCase('fr').includes(q),
-  )
+  const list = (exercises.data ?? []).filter((e) => matchesExercise(e, q))
 
   async function remove(ex: Exercise) {
     setDeleting(null)

@@ -159,7 +159,7 @@ img, svg, video { max-inline-size: 100%; block-size: auto; }
 /* ==========================================================================
    Verre : la surface commune à toutes les tuiles
    ========================================================================== */
-.card, .tile, .session-row, .kpis, dialog, .empty, .top-bar .avatar, .tab-bar, .staff-nav {
+.card, .tile, .session-row, .kpis, dialog, .empty, .tab-bar, .staff-nav {
   background: linear-gradient(180deg, var(--verre-haut), var(--verre));
   border: 1px solid var(--bord);
   box-shadow: var(--reflet);
@@ -911,8 +911,6 @@ progress { inline-size: 100%; accent-color: var(--cuivre); }
   font-size: 0.78rem;
 }
 .machine-brand { font-weight: 700; color: var(--cuivre-clair); }
-.equipment-fields { border: 0; padding: 0; margin: 0; }
-.equipment-fields legend { padding: 0 0 0.4rem; font-size: var(--step--1); color: var(--texte-2); }
 .machine-line { display: block; }
 
 /* La même série la dernière fois, sous la charge */

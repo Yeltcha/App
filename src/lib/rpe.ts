@@ -1,3 +1,5 @@
+import { decimalText } from './numbers'
+
 /**
  * Programmation au RPE.
  *
@@ -48,12 +50,5 @@ export function loadFromRpe(oneRepMaxKg: number, reps: number, rpe: number, step
   return { kg: roundLoad((oneRepMaxKg * percent) / 100, step), percent, rir: rirFor(rpe) }
 }
 
-/** 1RM estimé à partir d'une série et du RPE ressenti (inverse de la table). */
-export function oneRepMaxFromRpe(weightKg: number, reps: number, rpe: number): number | null {
-  const percent = percentOf1RM(reps, rpe)
-  if (percent === null || !(weightKg > 0)) return null
-  return Math.round((weightKg / percent) * 1000) / 10
-}
-
 /** Affichage français : 8 → « 8 », 7,5 → « 7,5 ». */
-export const formatRpe = (rpe: number) => String(rpe).replace('.', ',')
+export const formatRpe = (rpe: number) => decimalText(rpe)

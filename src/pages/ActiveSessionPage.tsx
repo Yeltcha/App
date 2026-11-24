@@ -6,10 +6,11 @@ import { supabase, unwrap } from '../lib/supabase'
 import { byId, useEquipment, useExercises, useGymExercises, useGyms } from '../lib/queries'
 import { ACTIVE_SESSION_KEY, lastSessionSets, useActiveSession } from '../lib/sessions'
 import type { PreviousSet } from '../lib/lastSession'
-import { formatShortDate } from '../lib/dates'
 import { MUSCLE_LABELS, type Exercise, type Session, type SessionSet } from '../lib/types'
-import { parseDecimal } from '../lib/numbers'
-import { formatDuration } from '../lib/dates'
+import { decimalText, formatNumber, parseDecimal } from '../lib/numbers'
+import { formatDuration, formatShortDate } from '../lib/dates'
+import { groupByExercise } from '../lib/sessionSets'
+import { machineLabel, matchesExercise } from '../lib/machines'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
 import { RestTimer } from '../components/RestTimer'
@@ -19,7 +20,6 @@ import { isBarbellExercise } from '../lib/plates'
 import { readRestEnd, writeRestEnd } from '../lib/restStorage'
 import { restsAfter, sessionSupersets, slotLabel } from '../lib/superset'
 import { formatRpe, percentOf1RM, RPE_VALUES, rirFor } from '../lib/rpe'
-import { formatNumber } from '../lib/numbers'
 import { SET_KIND_LABELS } from '../lib/setPlan'
 
 export default function ActiveSessionPage() {
@@ -85,15 +85,7 @@ function SessionRunner({ session }: { session: Session }) {
     queryFn: () => lastSessionSets(session.athlete_id, exerciseIds),
   })
 
-  const groups = useMemo(() => {
-    const map = new Map<number, SessionSet[]>()
-    for (const s of sets.data ?? []) {
-      const list = map.get(s.exercise_position) ?? []
-      list.push(s)
-      map.set(s.exercise_position, list)
-    }
-    return [...map.entries()].sort((a, b) => a[0] - b[0])
-  }, [sets.data])
+  const groups = useMemo(() => groupByExercise(sets.data ?? []), [sets.data])
   const supersets = useMemo(
     () => sessionSupersets(groups.map(([position, group]) => ({ position, group: group[0].superset_group }))),
     [groups],
@@ -248,7 +240,7 @@ function SessionRunner({ session }: { session: Session }) {
               </p>
             )}
             <p className="muted small exercise-meta">
-              {eq && <span>{eq.name}{eq.brand ? ` (${eq.brand})` : ''}</span>}
+              {eq && <span>{machineLabel(eq)}</span>}
               <span>{prev?.sets.length
                 ? `Dernière fois${prev.date ? ` (${formatShortDate(prev.date)})` : ''} : ${prev.sets.map((p) => `${formatNumber(p.weight_kg)} × ${p.reps}`).join(' · ')}`
                 : 'Première fois sur cet exercice'}</span>
@@ -393,7 +385,7 @@ function SetRow({ set, exerciseName, cardio, withRpe, showTarget, before, onUpda
       </th>
       <td>
         <input type="text" inputMode="decimal" enterKeyHint="next" aria-label={`Charge, ${label}`}
-          defaultValue={String(Number(set.weight_kg)).replace('.', ',')}
+          defaultValue={decimalText(set.weight_kg)}
           onInput={(e) => e.currentTarget.setCustomValidity('')}
           onBlur={(e) => commitWeight(e.currentTarget)} />
         {before && !cardio && (
@@ -437,9 +429,7 @@ function ExercisePicker({ gymId, onPick }: { gymId: string | null; onPick: (e: E
   const available = useGymExercises(gymId)
   const [query, setQuery] = useState('')
   const normalized = query.trim().toLocaleLowerCase('fr')
-  const list = (available.data ?? []).filter(
-    (e) => !normalized || e.name.toLocaleLowerCase('fr').includes(normalized) || MUSCLE_LABELS[e.muscle_group].toLocaleLowerCase('fr').includes(normalized),
-  )
+  const list = (available.data ?? []).filter((e) => matchesExercise(e, normalized))
   return (
     <div className="stack">
       <search>
