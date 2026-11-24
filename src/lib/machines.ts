@@ -1,6 +1,13 @@
-import type { Equipment, Exercise } from './types'
+import { MUSCLE_LABELS, type Equipment, type Exercise } from './types'
 
 export interface Link { exercise_id: string; equipment_id: string }
+
+/** « Pec deck (Technogym) » */
+export const machineLabel = (eq: Pick<Equipment, 'name' | 'brand'>) => `${eq.name}${eq.brand ? ` (${eq.brand})` : ''}`
+
+/** Recherche d'un exercice par nom ou par muscle (requête déjà en minuscules). */
+export const matchesExercise = (e: Pick<Exercise, 'name' | 'muscle_group'>, query: string) =>
+  !query || e.name.toLocaleLowerCase('fr').includes(query) || MUSCLE_LABELS[e.muscle_group].toLocaleLowerCase('fr').includes(query)
 
 const same = (a: string | null | undefined, b: string | null | undefined) =>
   Boolean(a && b && a.trim().toLocaleLowerCase('fr') === b.trim().toLocaleLowerCase('fr'))

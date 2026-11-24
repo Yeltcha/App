@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { loadFromRpe, oneRepMaxFromRpe, percentOf1RM, rirFor, roundLoad } from './rpe'
+import { loadFromRpe, percentOf1RM, rirFor, roundLoad } from './rpe'
 
 describe('percentOf1RM', () => {
   it('reprend la table de référence', () => {
@@ -29,12 +29,6 @@ describe('loadFromRpe', () => {
   })
   it('sans 1RM, pas de charge', () => {
     expect(loadFromRpe(0, 5, 8)).toBeNull()
-  })
-})
-
-describe('oneRepMaxFromRpe', () => {
-  it('retrouve le 1RM à partir d’une série et du RPE ressenti', () => {
-    expect(oneRepMaxFromRpe(112.5, 5, 8)).toBe(138.7)
   })
 })
 

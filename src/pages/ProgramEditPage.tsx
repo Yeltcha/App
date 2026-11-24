@@ -2,13 +2,13 @@ import { Fragment, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, unwrap } from '../lib/supabase'
-import { byId, useEquipment, useExerciseEquipment, useExercises, useGymExercises, useGyms, useProfiles } from '../lib/queries'
+import { byId, useEquipment, useExerciseEquipment, useExercises, useGyms, useProfiles } from '../lib/queries'
 import { SPECIALTY_LABELS, type Program, type Specialty, type Workout, type WorkoutExercise } from '../lib/types'
-import { formatKg, formatNumber, parseDecimal } from '../lib/numbers'
+import { decimalText, formatKg, formatNumber, parseDecimal } from '../lib/numbers'
 import { plannedRpeLoad, referenceMaxes, type ReferenceMax } from '../lib/oneRepMax'
 import { formatRpe, RPE_VALUES, rirFor } from '../lib/rpe'
 import { formatShortDate } from '../lib/dates'
-import { exerciseChoices } from '../lib/machines'
+import { exerciseChoices, machineLabel } from '../lib/machines'
 import { restsAfter, slotLabel, supersetSlots, type SupersetSlot } from '../lib/superset'
 import { describeSet, plannedSetLoad, plannedSets, rampRpe, SET_KIND_LABELS, SET_KINDS, type PlannedSet, type SetKind } from '../lib/setPlan'
 import { RpeTable } from '../components/RpeTable'
@@ -320,11 +320,11 @@ function PlanRow({ item, index, count, max, slot, onEdit, onMove, onDelete }: {
   slot: SupersetSlot | null
   onEdit: () => void; onMove: (d: -1 | 1) => void; onDelete: () => void
 }) {
-  const exercises = byId(useGymExercises(null).data)
+  const exercises = byId(useExercises().data)
   const equipment = byId(useEquipment().data)
   const name = exercises.get(item.exercise_id)?.name ?? 'Exercice'
   const machine = item.equipment_id ? equipment.get(item.equipment_id) : undefined
-  const machineText = machine ? `${machine.name}${machine.brand ? ` (${machine.brand})` : ''}` : ''
+  const machineText = machine ? machineLabel(machine) : ''
   const sets = plannedSets(item)
   const varied = item.set_plan !== null
   const first = sets[0]
@@ -365,10 +365,9 @@ const SPECIALTIES: Specialty[] = ['force', 'bodybuilding', 'cardio']
 
 interface RowState { kind: SetKind; repMin: string; repMax: string; rpe: string; weight: string }
 
-const kgText = (kg: number | null | undefined) => (kg == null ? '' : String(Number(kg)).replace('.', ','))
 const toRow = (s: PlannedSet): RowState => ({
   kind: s.kind, repMin: String(s.rep_min), repMax: s.rep_max == null ? '' : String(s.rep_max),
-  rpe: s.target_rpe == null ? '' : String(s.target_rpe), weight: kgText(s.target_weight_kg),
+  rpe: s.target_rpe == null ? '' : String(s.target_rpe), weight: decimalText(s.target_weight_kg),
 })
 
 function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
@@ -390,7 +389,7 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
   const [repMin, setRepMin] = useState(String(item?.rep_min ?? 8))
   const [repMax, setRepMax] = useState(item?.rep_max != null ? String(item.rep_max) : '')
   const [rpe, setRpe] = useState(item?.target_rpe != null ? String(Number(item.target_rpe)) : '')
-  const [weightText, setWeightText] = useState(kgText(item?.target_weight_kg))
+  const [weightText, setWeightText] = useState(decimalText(item?.target_weight_kg))
   const [perSet, setPerSet] = useState(Boolean(item?.set_plan))
   const [rows, setRows] = useState<RowState[]>(() => (item?.set_plan ? plannedSets(item).map(toRow) : []))
   const [error, setError] = useState<string | null>(null)

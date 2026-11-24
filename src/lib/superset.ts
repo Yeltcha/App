@@ -37,22 +37,20 @@ export function supersetSlots(items: { superset_with_previous: boolean }[]): (Su
 export const slotLabel = (slot: SupersetSlot) => `${slot.letter}${slot.order}`
 
 /**
- * Supersets d'une séance en cours, à partir des numéros enregistrés sur les séries.
- * `positions` : positions des exercices dans l'ordre ; `groupOf` : numéro du superset.
+ * Supersets d'une séance en cours, à partir des numéros enregistrés sur les séries :
+ * deux exercices qui se suivent avec le même numéro sont enchaînés (même règle que supersetSlots).
+ * Renvoie la place de chaque exercice, par position ; `group` = position du premier exercice.
  */
-export function sessionSupersets(positions: { position: number; group: number | null }[]): Map<number, SupersetSlot> {
-  const members = new Map<number, number[]>()
-  for (const p of positions) {
-    if (p.group === null) continue
-    members.set(p.group, [...(members.get(p.group) ?? []), p.position])
-  }
+export function sessionSupersets(exercises: { position: number; group: number | null }[]): Map<number, SupersetSlot> {
+  const sorted = [...exercises].sort((a, b) => a.position - b.position)
+  const slots = supersetSlots(sorted.map((e, i) => ({
+    superset_with_previous: i > 0 && e.group !== null && e.group === sorted[i - 1].group,
+  })))
   const result = new Map<number, SupersetSlot>()
-  let letterIndex = 0
-  for (const [group, list] of [...members.entries()].sort((a, b) => Math.min(...a[1]) - Math.min(...b[1]))) {
-    if (list.length < 2) continue
-    const letter = String.fromCharCode(65 + (letterIndex++ % 26))
-    list.sort((a, b) => a - b).forEach((position, i) => result.set(position, { group, letter, order: i + 1, size: list.length }))
-  }
+  sorted.forEach((e, i) => {
+    const slot = slots[i]
+    if (slot) result.set(e.position, { ...slot, group: sorted[slot.group].position })
+  })
   return result
 }
 
