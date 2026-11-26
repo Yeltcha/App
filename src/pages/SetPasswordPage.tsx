@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { ErrorMessage } from '../components/Feedback'
+import { AuthBrand } from '../components/AuthBrand'
 
 export function SetPasswordPage() {
   const { clearMustSetPassword, profile, refreshProfile } = useAuth()
@@ -40,8 +41,12 @@ export function SetPasswordPage() {
 
   return (
     <main className="page narrow auth-page">
-      <h1>Bienvenue</h1>
-      <form onSubmit={onSubmit} aria-labelledby="pw-title" className="card stack">
+      <AuthBrand />
+      <div className="auth-hero">
+        <h1 className="auth-title">Bienvenue <span>dans l’équipe.</span></h1>
+        <p className="auth-tagline">Dernière étape avant ta première séance.</p>
+      </div>
+      <form onSubmit={onSubmit} aria-labelledby="pw-title" className="card stack auth-card">
         <h2 id="pw-title">Choisis ton mot de passe</h2>
         <div className="field">
           <label htmlFor="full_name">Nom affiché</label>

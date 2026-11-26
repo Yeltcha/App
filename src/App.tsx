@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react'
-import { NavLink, Navigate, Route, Routes } from 'react-router'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router'
 import { useAuth } from './lib/auth'
 import { Icon, type IconName } from './components/Icon'
 import { Loading } from './components/Feedback'
@@ -36,6 +36,44 @@ function initials(name: string | undefined): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]!.toLocaleUpperCase('fr')).join('')
 }
 
+/** Menu coach : en ligne sur grand écran, menu déroulant sur téléphone. */
+function StaffMenu() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const { pathname } = useLocation()
+  const current = STAFF_NAV.find((item) => pathname.startsWith(item.to))
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      document.removeEventListener('keydown', close)
+    }
+  }, [open])
+
+  return (
+    <div className="staff-menu" ref={ref}>
+      <button type="button" className="menu-toggle" aria-expanded={open} aria-controls="staff-nav" onClick={() => setOpen(!open)}>
+        <Icon name={open ? 'close' : 'menu'} />
+        <span>{current?.label ?? 'Espace coach'}</span>
+      </button>
+      <nav id="staff-nav" aria-label="Espace coach" className={open ? 'staff-nav open' : 'staff-nav'}>
+        {STAFF_NAV.map((item) => (
+          <NavLink key={item.to} to={item.to} onClick={() => setOpen(false)}>
+            <Icon name={item.icon} />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+    </div>
+  )
+}
+
 export function App() {
   const { session, loading, mustSetPassword, isStaff, profile } = useAuth()
 
@@ -50,16 +88,7 @@ export function App() {
           <span className="brand-mark" aria-hidden="true" />
           Praug
         </a>
-        {isStaff && (
-          <nav aria-label="Espace coach" className="staff-nav">
-            {STAFF_NAV.map((item) => (
-              <NavLink key={item.to} to={item.to}>
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
-          </nav>
-        )}
+        {isStaff && <StaffMenu />}
         <span className="user-name" role="img" title={profile?.full_name} aria-label={profile?.full_name}>{initials(profile?.full_name)}</span>
       </header>
 

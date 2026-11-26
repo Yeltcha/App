@@ -63,3 +63,4 @@ rouge 25 kg `#E23A2E`, bleu 20 kg `#2F6BF0`, jaune 15 kg `#F4C21B`, vert 10 kg `
 - **Passe 4** : Praug. Disques calibrés, Big Shoulders et pochoir, schéma de barre chargée, piste de séries.
 - **Passe 5** : encadrés, boutons et police jugés encore génériques. Coin coupé, angles vifs, boutons en capitales, champs soulignés, Familjen Grotesk, numéros de poste, bande moletée.
 - **Passe 6** : d’après trois inspirations fournies par Youri. Outfit, noir et cuivre, verre dépoli, tuiles, anneaux, calendrier en points, barre d’onglets flottante, nouvelle icône.
+- **Passe 7** : connexion et choix du mot de passe alignés sur l’app (marque avec point cuivre, titre en deux tons, barre chargée en signature, carte de verre). Menu coach en menu déroulant sur téléphone. Séances d’un programme et exercices d’une séance repliables. Encadré « Consignes » cuivré en séance.

@@ -49,12 +49,15 @@ export function useExerciseEquipment() {
   })
 }
 
-/** Exercices disponibles dans une salle (selon ses équipements). */
+/**
+ * Exercices disponibles dans une salle (selon ses machines).
+ * Sans salle : seulement les exercices sans machine, comme à la programmation.
+ */
 export function useGymExercises(gymId: string | null | undefined) {
   return useQuery({
     queryKey: ['gym_exercises', gymId],
     queryFn: async () => {
-      if (!gymId) return unwrap(await supabase.from('exercises').select('*').order('name')) as Exercise[]
+      if (!gymId) return unwrap(await supabase.from('exercises').select('*').eq('requires_equipment', false).order('name')) as Exercise[]
       return unwrap(
         await supabase.from('gym_exercises').select('*').eq('gym_id', gymId).order('name'),
       ) as Exercise[]
