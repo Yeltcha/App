@@ -1066,3 +1066,28 @@ progress { inline-size: 100%; accent-color: var(--cuivre); }
 @media (max-width: 39.99rem) { .inline-form > button { grid-column: 1 / -1; } }
 .goal-row { display: grid; gap: 0.5rem; }
 .goal-row .badge { margin-inline-start: 0.35rem; }
+
+/* Mes 1RM : une ligne par exercice, la charge en avant */
+.max-list { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.max-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: var(--r-champ);
+  background: rgb(255 255 255 / 0.04);
+}
+.max-info { display: grid; gap: 0.15rem; min-inline-size: 0; }
+.max-name { font-weight: 600; line-height: 1.25; }
+.max-load {
+  font-size: var(--step-2);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--cuivre-clair);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.max-unit { margin-inline-start: 0.2em; font-size: 0.6em; font-weight: 500; color: var(--texte-2); }

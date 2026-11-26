@@ -5,8 +5,8 @@ import { useAuth } from '../lib/auth'
 import { supabase, unwrap } from '../lib/supabase'
 import { byId, useExercises, useProfiles } from '../lib/queries'
 import { ROLE_LABELS, type BodyWeight, type Goal, type OneRepMax, type Profile } from '../lib/types'
-import { formatKg, parseDecimal } from '../lib/numbers'
-import { formatLongDate, todayISO } from '../lib/dates'
+import { formatKg, formatNumber, parseDecimal } from '../lib/numbers'
+import { formatLongDate, formatShortDateYear, todayISO } from '../lib/dates'
 import { LineChartCard } from '../components/LineChartCard'
 import { ErrorMessage, Loading } from '../components/Feedback'
 
@@ -59,6 +59,12 @@ export default function ProfilePage() {
   if (data.isPending) return <Loading />
   if (data.error) return <ErrorMessage error={data.error} />
   const { profile, weights, maxes, goals } = data.data
+  // Dernier 1RM par exercice (la liste arrive du plus récent au plus ancien), et le test d'avant pour comparer
+  const maxesByExercise = new Map<string, OneRepMax[]>()
+  for (const m of maxes) maxesByExercise.set(m.exercise_id, [...(maxesByExercise.get(m.exercise_id) ?? []), m])
+  const latestMaxes = [...maxesByExercise.values()]
+    .map(([latest, previous]) => ({ latest, previous }))
+    .sort((a, b) => (exerciseMap.get(a.latest.exercise_id)?.name ?? '').localeCompare(exerciseMap.get(b.latest.exercise_id)?.name ?? '', 'fr'))
   const isMe = profile.id === me?.id
 
   function onProfile(e: FormEvent<HTMLFormElement>) {
@@ -176,11 +182,19 @@ export default function ProfilePage() {
       <section className="card stack" aria-labelledby="max-title">
         <h2 id="max-title">Mes 1RM</h2>
         {maxes.length === 0 ? <p className="muted">Aucun 1RM renseigné.</p> : (
-          <ul className="plain-list">
-            {maxes.map((m) => (
-              <li key={m.id} className="row between">
-                <span><strong>{exerciseMap.get(m.exercise_id)?.name}</strong> : {formatKg(Number(m.weight_kg))}</span>
-                <span className="muted small">{formatLongDate(m.tested_on)}</span>
+          <ul className="max-list">
+            {latestMaxes.map(({ latest, previous }) => (
+              <li key={latest.exercise_id} className="max-row">
+                <div className="max-info">
+                  <span className="max-name">{exerciseMap.get(latest.exercise_id)?.name}</span>
+                  <span className="muted small">
+                    {formatShortDateYear(latest.tested_on)}
+                    {previous && <> · avant : {formatKg(Number(previous.weight_kg))}</>}
+                  </span>
+                </div>
+                <span className="max-load">
+                  {formatNumber(Number(latest.weight_kg))}<span className="max-unit">kg</span>
+                </span>
               </li>
             ))}
           </ul>
