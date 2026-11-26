@@ -6,7 +6,7 @@ import { supabase, unwrap } from '../lib/supabase'
 import { byId, useEquipment, useExercises, useGymExercises, useGyms } from '../lib/queries'
 import { ACTIVE_SESSION_KEY, lastSessionSets, useActiveSession } from '../lib/sessions'
 import type { PreviousSet } from '../lib/lastSession'
-import { MUSCLE_LABELS, type Exercise, type Session, type SessionSet } from '../lib/types'
+import { MUSCLE_LABELS, type Exercise, type Session, type SessionSet, type WorkoutExercise } from '../lib/types'
 import { decimalText, formatNumber, parseDecimal } from '../lib/numbers'
 import { formatDuration, formatShortDate } from '../lib/dates'
 import { groupByExercise } from '../lib/sessionSets'
@@ -15,6 +15,8 @@ import { ConfirmDialog, Dialog } from '../components/Dialog'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
 import { RestTimer } from '../components/RestTimer'
 import { BarLoad } from '../components/BarLoad'
+import { CollapseButton } from '../components/Icon'
+import { useCollapsed } from '../lib/collapsed'
 import { ProgressRing } from '../components/ProgressRing'
 import { isBarbellExercise } from '../lib/plates'
 import { readRestEnd, writeRestEnd } from '../lib/restStorage'
@@ -74,6 +76,16 @@ function SessionRunner({ session }: { session: Session }) {
           .order('exercise_position').order('set_number'),
       ) as SessionSet[],
   })
+
+  // Consignes de la séance programmée, dans l'ordre des exercices
+  const plan = useQuery({
+    queryKey: ['session-plan', session.workout_id],
+    enabled: Boolean(session.workout_id),
+    queryFn: async () =>
+      unwrap(await supabase.from('workout_exercises').select('position, notes, notes_visible')
+        .eq('workout_id', session.workout_id!).order('position')) as Pick<WorkoutExercise, 'position' | 'notes' | 'notes_visible'>[],
+  })
+  const folded = useCollapsed(`praug:seance-repliee:${session.id}`, 'session')
 
   const exerciseIds = useMemo(
     () => [...new Set((sets.data ?? []).map((s) => s.exercise_id))],
@@ -207,6 +219,13 @@ function SessionRunner({ session }: { session: Session }) {
 
       {sets.isPending && <Loading />}
       {groups.length === 0 && !sets.isPending && <Empty>Ajoute un premier exercice pour commencer.</Empty>}
+      {groups.length > 1 && (
+        <div className="fold-all">
+          <button type="button" className="link" onClick={() => folded.setAll(folded.count ? [] : groups.map(([p]) => String(p)))}>
+            {folded.count ? 'Tout déplier' : 'Tout replier'}
+          </button>
+        </div>
+      )}
 
       {groups.map(([position, group], index) => {
         const exercise = exerciseMap.get(group[0].exercise_id)
@@ -224,13 +243,23 @@ function SessionRunner({ session }: { session: Session }) {
         const targetPercent = targetRpe !== null ? percentOf1RM(nextSet.reps, targetRpe) : null
         const slot = supersets.get(position)
         const nextInSuperset = slot && slot.order < slot.size ? groups[index + 1] : undefined
+        const collapsed = folded.isCollapsed(String(position))
+        const bodyId = `ex-body-${position}`
+        const doneHere = group.filter((s) => s.done).length
+        const planned = plan.data?.[position]
+        const showNotes = planned?.notes_visible ?? true
         const supersetClass = slot ? ` in-superset${slot.order === 1 ? ' superset-first' : ''}${slot.order === slot.size ? ' superset-last' : ''}` : ''
         return (
-          <section key={position} className={`card exercise-block${supersetClass}`} aria-labelledby={headingId}>
-            <h2 id={headingId}>
-              <span className="station" aria-hidden="true">{slot ? slotLabel(slot) : String(index + 1).padStart(2, '0')}</span>
-              {exercise?.name ?? 'Exercice'}
-            </h2>
+          <section key={position} className={`card exercise-block${supersetClass}${collapsed ? ' collapsed' : ''}`} aria-labelledby={headingId}>
+            <div className="block-head">
+              <h2 id={headingId}>
+                <span className="station" aria-hidden="true">{slot ? slotLabel(slot) : String(index + 1).padStart(2, '0')}</span>
+                {exercise?.name ?? 'Exercice'}
+              </h2>
+              {collapsed && <span className="muted small fold-summary">{doneHere} / {group.length} {cardio ? 'blocs' : 'séries'}</span>}
+              <CollapseButton label={exercise?.name ?? 'l’exercice'} collapsed={collapsed} controls={bodyId} onToggle={() => folded.toggle(String(position))} />
+            </div>
+            <div id={bodyId} className="block-body" hidden={collapsed}>
             {slot && (
               <p className="superset-note">
                 <span className="superset-tag">Superset {slot.letter}</span>
@@ -245,6 +274,13 @@ function SessionRunner({ session }: { session: Session }) {
                 ? `Dernière fois${prev.date ? ` (${formatShortDate(prev.date)})` : ''} : ${prev.sets.map((p) => `${formatNumber(p.weight_kg)} × ${p.reps}`).join(' · ')}`
                 : 'Première fois sur cet exercice'}</span>
             </p>
+            {showNotes && (planned?.notes || exercise?.description) && (
+              <div className="coach-notes">
+                <span className="coach-notes-label">Consignes</span>
+                {planned?.notes && <p>{planned.notes}</p>}
+                {exercise?.description && <p className="muted">{exercise.description}</p>}
+              </div>
+            )}
             {targetRpe !== null && (
               <p className="rpe-target">
                 <span className="rpe-target-value">RPE {formatRpe(targetRpe)}</span>
@@ -275,6 +311,7 @@ function SessionRunner({ session }: { session: Session }) {
               </tbody>
             </table>
             <button type="button" className="add-set" onClick={() => addSet(group)}>+ Ajouter une série</button>
+            </div>
           </section>
         )
       })}
@@ -437,7 +474,9 @@ function ExercisePicker({ gymId, onPick }: { gymId: string | null; onPick: (e: E
         <input id="ex-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)}
           autoComplete="off" autoCorrect="off" spellCheck={false} autoFocus />
       </search>
-      {gymId && <p className="hint">Seuls les exercices disponibles dans cette salle sont listés.</p>}
+      <p className="hint">{gymId
+        ? 'Exercices sans machine et exercices des machines de cette salle.'
+        : 'Aucune salle choisie : seuls les exercices sans machine sont proposés.'}</p>
       {available.isPending && <Loading />}
       <ul className="plain-list picker-list">
         {list.map((e) => (

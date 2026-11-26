@@ -13,6 +13,8 @@ import { restsAfter, slotLabel, supersetSlots, type SupersetSlot } from '../lib/
 import { describeSet, plannedSetLoad, plannedSets, rampRpe, SET_KIND_LABELS, SET_KINDS, type PlannedSet, type SetKind } from '../lib/setPlan'
 import { RpeTable } from '../components/RpeTable'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
+import { CollapseButton } from '../components/Icon'
+import { useCollapsed } from '../lib/collapsed'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
 
 interface ProgramData {
@@ -27,6 +29,7 @@ export default function ProgramEditPage() {
   const profiles = useProfiles()
   const gyms = useGyms()
   const exerciseNames = byId(useExercises().data)
+  const folded = useCollapsed(`praug:programme-replie:${id}`)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState('')
   const [addingWorkout, setAddingWorkout] = useState(false)
@@ -199,14 +202,30 @@ export default function ProgramEditPage() {
           <h2 id="workouts-title">Séances du programme</h2>
           <button type="button" className="primary" onClick={() => setAddingWorkout(true)}>+ Ajouter une séance</button>
         </div>
-        <p className="hint">L’ordre des séances définit le cycle : après la dernière, on revient à la première.</p>
+        <div className="row between wrap">
+          <p className="hint">L’ordre des séances définit le cycle : après la dernière, on revient à la première.</p>
+          {workouts.length > 1 && (
+            <button type="button" className="link" onClick={() => folded.setAll(folded.count ? [] : workouts.map((w) => w.id))}>
+              {folded.count ? 'Tout déplier' : 'Tout replier'}
+            </button>
+          )}
+        </div>
         {workouts.length === 0 && <Empty>Aucune séance. Ajoute par exemple « Push », « Pull » et « Legs ».</Empty>}
         <ol className="plain-list stack">
           {workouts.map((w, wi) => (
-            <li key={w.id} className="card stack">
+            <li key={w.id} className={folded.isCollapsed(w.id) ? 'card stack collapsed' : 'card stack'}>
               <div className="row between wrap">
-                <h3>{wi + 1}. {w.name}</h3>
+                <div className="item-text">
+                  <h3>{wi + 1}. {w.name}</h3>
+                  {folded.isCollapsed(w.id) && (
+                    <span className="muted small">
+                      {w.exercises.length} exercice{w.exercises.length > 1 ? 's' : ''}
+                      {w.gym_id ? ` · ${gyms.data?.find((g) => g.id === w.gym_id)?.name ?? ''}` : ''}
+                    </span>
+                  )}
+                </div>
                 <div className="row">
+                  <CollapseButton label={w.name} collapsed={folded.isCollapsed(w.id)} controls={`workout-body-${w.id}`} onToggle={() => folded.toggle(w.id)} />
                   <button type="button" className="icon-button" aria-label={`Monter ${w.name}`} disabled={wi === 0} onClick={() => swap('workouts', workouts, wi, -1)}>↑</button>
                   <button type="button" className="icon-button" aria-label={`Descendre ${w.name}`} disabled={wi === workouts.length - 1} onClick={() => swap('workouts', workouts, wi, 1)}>↓</button>
                   <button type="button" className="icon-button" aria-label={`Supprimer ${w.name}`} onClick={() => setConfirm({
@@ -215,6 +234,7 @@ export default function ProgramEditPage() {
                   })}>✕</button>
                 </div>
               </div>
+              <div id={`workout-body-${w.id}`} className="stack" hidden={folded.isCollapsed(w.id)}>
               <WorkoutGymField workout={w} gyms={gyms.data ?? []} onSaved={refresh} />
               {w.exercises.length === 0 ? <p className="muted small">Aucun exercice.</p> : (
                 <ol className="plain-list exercise-plan">
@@ -244,6 +264,7 @@ export default function ProgramEditPage() {
                 <p className="hint">« + Superset » enchaîne deux exercices sans repos entre eux ; le repos du dernier exercice s’applique après chaque tour.</p>
               )}
               <button type="button" onClick={() => setEditingExercise({ workout: w, item: null })}>+ Ajouter un exercice</button>
+              </div>
             </li>
           ))}
         </ol>
@@ -478,6 +499,7 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
       set_plan: plan,
       rest_sec: Number(f.get('rest')),
       notes: String(f.get('notes')).trim() || null,
+      notes_visible: f.get('notes_visible') === 'on',
     }
     const { error } = item
       ? await supabase.from('workout_exercises').update(values).eq('id', item.id)
@@ -590,6 +612,11 @@ function PlanForm({ workout, item, nextPosition, assigned, maxes, onDone }: {
         <label htmlFor="pf-notes">Consignes (facultatif)</label>
         <input id="pf-notes" name="notes" defaultValue={item?.notes ?? ''} />
       </div>
+      <label className="check-row">
+        <input type="checkbox" name="notes_visible" defaultChecked={item?.notes_visible ?? true} />
+        Afficher les consignes à l’athlète pendant la séance
+      </label>
+      <p className="hint">Celles de cet exercice programmé et celles de sa fiche dans la bibliothèque.</p>
       {error && <p role="alert" className="error">{error}</p>}
       <button type="submit" className="primary">Enregistrer</button>
     </form>

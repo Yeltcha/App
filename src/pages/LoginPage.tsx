@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { ErrorMessage } from '../components/Feedback'
+import { AuthBrand } from '../components/AuthBrand'
 
 export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
@@ -33,11 +34,12 @@ export function LoginPage() {
 
   return (
     <main className="page narrow auth-page">
-      <div className="stack-sm">
-        <h1 className="auth-title">Praug</h1>
-        <p className="muted">Ton programme, tes charges, ta progression.</p>
+      <AuthBrand />
+      <div className="auth-hero">
+        <h1 className="auth-title">Charge la barre, <span>on s’occupe du reste.</span></h1>
+        <p className="auth-tagline">Ton programme, tes charges, ta progression.</p>
       </div>
-      <form onSubmit={onSubmit} aria-labelledby="login-title" className="card stack">
+      <form onSubmit={onSubmit} aria-labelledby="login-title" className="card stack auth-card">
         <h2 id="login-title">{mode === 'login' ? 'Connexion' : 'Mot de passe oublié'}</h2>
         <div className="field">
           <label htmlFor="email">Email</label>
@@ -59,7 +61,7 @@ export function LoginPage() {
           {mode === 'login' ? 'Mot de passe oublié ?' : 'Retour à la connexion'}
         </button>
       </form>
-      <p className="muted small">Pas de compte ? Demande une invitation à ton coach.</p>
+      <p className="auth-foot">Pas de compte ? Demande une invitation à ton coach.</p>
     </main>
   )
 }

@@ -131,6 +131,8 @@ export interface WorkoutExercise {
   set_plan: PlannedSet[] | null
   /** Enchaîné en superset avec l'exercice précédent */
   superset_with_previous: boolean
+  /** L'athlète voit les consignes pendant la séance */
+  notes_visible: boolean
 }
 
 export interface Session {
