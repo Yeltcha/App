@@ -17,6 +17,7 @@ export function todayISO(): string {
 
 const LONG_DATE: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
 const SHORT_DATE: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
+const SHORT_DATE_YEAR: Intl.DateTimeFormatOptions = { ...SHORT_DATE, year: 'numeric' }
 
 export function formatLongDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString('fr-FR', LONG_DATE)
@@ -24,6 +25,11 @@ export function formatLongDate(iso: string): string {
 
 export function formatShortDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString('fr-FR', SHORT_DATE)
+}
+
+/** « 20 nov. 2026 » */
+export function formatShortDateYear(iso: string): string {
+  return Temporal.PlainDate.from(iso).toLocaleString('fr-FR', SHORT_DATE_YEAR)
 }
 
 let durationFormat: Intl.DurationFormat | null | undefined
