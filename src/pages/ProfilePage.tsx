@@ -160,7 +160,7 @@ export default function ProfilePage() {
       <section className="card stack" aria-labelledby="weight-title">
         <h2 id="weight-title">Évolution du poids</h2>
         <LineChartCard title="Poids de corps" unit="kg" points={weights.map((w) => ({ date: w.measured_on, value: Number(w.weight_kg) }))} />
-        <form onSubmit={onWeight} className="row wrap end-items" aria-label="Ajouter une pesée">
+        <form onSubmit={onWeight} className="inline-form" aria-label="Ajouter une pesée">
           <div className="field">
             <label htmlFor="weight">Poids (kg)</label>
             <input id="weight" name="weight" type="text" inputMode="decimal" required onInput={clearValidity} />
@@ -185,8 +185,8 @@ export default function ProfilePage() {
             ))}
           </ul>
         )}
-        <form onSubmit={onMax} className="row wrap end-items" aria-label="Ajouter un 1RM">
-          <div className="field grow">
+        <form onSubmit={onMax} className="inline-form" aria-label="Ajouter un 1RM">
+          <div className="field span-all">
             <label htmlFor="max_exercise">Exercice</label>
             <select id="max_exercise" name="max_exercise" required>{exerciseOptions}</select>
           </div>
@@ -207,13 +207,13 @@ export default function ProfilePage() {
         {goals.length === 0 ? <p className="muted">Aucun objectif. Exemple : squat à 150 kg en 1RM.</p> : (
           <ul className="plain-list stack">
             {goals.map((g) => (
-              <li key={g.id} className="row between wrap">
+              <li key={g.id} className="goal-row">
                 <span>
                   <strong>{exerciseMap.get(g.exercise_id)?.name}</strong> : {formatKg(Number(g.target_1rm_kg))} (1RM)
                   {g.target_date && <span className="muted small">, avant le {formatLongDate(g.target_date)}</span>}
-                  {g.achieved_at && <span className="badge"> ✓ Atteint</span>}
+                  {g.achieved_at && <span className="badge">✓ Atteint</span>}
                 </span>
-                <span className="row">
+                <span className="row wrap">
                   {!g.achieved_at && (
                     <button type="button" onClick={() => run(() => supabase.from('goals').update({ achieved_at: today }).eq('id', g.id), 'Bravo, objectif atteint !')}>
                       Marquer atteint
@@ -227,8 +227,8 @@ export default function ProfilePage() {
             ))}
           </ul>
         )}
-        <form onSubmit={onGoal} className="row wrap end-items" aria-label="Ajouter un objectif">
-          <div className="field grow">
+        <form onSubmit={onGoal} className="inline-form" aria-label="Ajouter un objectif">
+          <div className="field span-all">
             <label htmlFor="goal_exercise">Exercice</label>
             <select id="goal_exercise" name="goal_exercise" required>{exerciseOptions}</select>
           </div>
