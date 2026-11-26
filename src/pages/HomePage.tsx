@@ -1,13 +1,15 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { Link } from 'react-router'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
 import { supabase, unwrap } from '../lib/supabase'
-import { ACTIVE_SESSION_KEY, startSession, useActiveSession } from '../lib/sessions'
-import { byId, useExercises, useGyms } from '../lib/queries'
-import type { BodyWeight, Program, SessionSummary, Workout, WorkoutExercise } from '../lib/types'
+import { useActiveSession } from '../lib/sessions'
+import { byId, useExercises } from '../lib/queries'
+import { useMyProgram, useNextWorkout } from '../lib/program'
+import type { BodyWeight, SessionSummary, Workout, WorkoutExercise } from '../lib/types'
 import { Dialog } from '../components/Dialog'
-import { Empty, ErrorMessage, Loading } from '../components/Feedback'
+import { StartSessionPicker } from '../components/StartSessionPicker'
+import { Empty, Loading } from '../components/Feedback'
 import { SessionRow } from '../components/SessionRow'
 import { BarLoad } from '../components/BarLoad'
 import { isBarbellExercise } from '../lib/plates'
@@ -25,44 +27,16 @@ function ago(iso: string): string {
   return `il y a ${days} jours`
 }
 
-const LAST_GYM_KEY = 'muscu:last-gym'
-
-function readLastGym(): string {
-  try { return localStorage.getItem(LAST_GYM_KEY) ?? '' } catch { return '' }
-}
-
 export function HomePage() {
   const { profile } = useAuth()
   const userId = profile?.id
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const gyms = useGyms()
   const active = useActiveSession(userId)
-  const [startFor, setStartFor] = useState<Workout | null | undefined>(undefined)
-  const [error, setError] = useState<unknown>(null)
-  const [pending, setPending] = useState(false)
+  // Fenêtre de démarrage : undefined = fermée ; initial absent = liste des séances ; null = séance libre
+  const [picker, setPicker] = useState<{ key: number, initial?: Workout | null } | undefined>(undefined)
+  const openPicker = (initial?: Workout | null) => setPicker({ key: Date.now(), initial })
 
-  const next = useQuery({
-    queryKey: ['next-workout', userId],
-    enabled: Boolean(userId),
-    queryFn: async () => (unwrap(await supabase.rpc('next_workout', { p_athlete: userId })) as Workout[])[0] ?? null,
-  })
-
-  const program = useQuery({
-    queryKey: ['my-program', userId],
-    enabled: Boolean(userId),
-    queryFn: async () => {
-      const p = unwrap(
-        await supabase.from('programs').select('*').eq('athlete_id', userId!).eq('is_active', true)
-          .order('updated_at', { ascending: false }).limit(1).maybeSingle(),
-      ) as Program | null
-      if (!p) return null
-      const workouts = unwrap(
-        await supabase.from('workouts').select('*').eq('program_id', p.id).order('position'),
-      ) as Workout[]
-      return { ...p, workouts }
-    },
-  })
+  const next = useNextWorkout(userId)
+  const program = useMyProgram(userId)
 
   const plan = useQuery({
     queryKey: ['workout-plan', next.data?.id],
@@ -105,27 +79,6 @@ export function HomePage() {
       unwrap(await supabase.from('body_weights').select('*').eq('athlete_id', userId!)
         .order('measured_on', { ascending: false }).limit(1).maybeSingle()) as BodyWeight | null,
   })
-
-  async function onStart(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    if (!userId) return
-    const gymId = String(new FormData(e.currentTarget).get('gym') || '') || null
-    setPending(true)
-    setError(null)
-    try {
-      try { if (gymId) localStorage.setItem(LAST_GYM_KEY, gymId) } catch { /* stockage indisponible */ }
-      await startSession({ athleteId: userId, gymId, workout: startFor })
-      await queryClient.invalidateQueries({ queryKey: ACTIVE_SESSION_KEY })
-      setStartFor(undefined)
-      navigate('/seance')
-    } catch (err) {
-      setError(err)
-    } finally {
-      setPending(false)
-    }
-  }
-
-  const gymForWorkout = startFor?.gym_id ?? readLastGym()
 
   const firstName = profile?.full_name.split(' ')[0] || ''
   const cycleIndex = program.data && next.data ? program.data.workouts.findIndex((w) => w.id === next.data!.id) : -1
@@ -172,30 +125,18 @@ export function HomePage() {
               })}
             </ul>
           )}
-          <button type="button" className="primary cta" onClick={() => setStartFor(next.data)}>
+          <button type="button" className="primary cta" onClick={() => openPicker(next.data)}>
             Démarrer {next.data.name}
           </button>
-          <div className="today-actions">
-            <button type="button" className="link" onClick={() => setStartFor(null)}>Séance libre</button>
-            {program.data && program.data.workouts.length > 1 && (
-              <details className="other-workouts">
-                <summary>Choisir une autre séance du programme</summary>
-                <ul className="plain-list">
-                  {program.data.workouts.map((w) => (
-                    <li key={w.id}>
-                      <button type="button" className="link" onClick={() => setStartFor(w)}>{w.name}</button>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </div>
+          <button type="button" className="link" onClick={() => openPicker()}>
+            Voir toutes les séances ou démarrer une séance libre
+          </button>
         </section>
       ) : (
         <section className="card today" aria-labelledby="next-title">
           <h2 className="today-title" id="next-title">Séance libre</h2>
           <p className="muted">Aucun programme ne t’est attribué pour l’instant. Lance une séance libre et choisis tes exercices au fil de l’eau.</p>
-          <button type="button" className="primary cta" onClick={() => setStartFor(null)}>Démarrer une séance libre</button>
+          <button type="button" className="primary cta" onClick={() => openPicker(null)}>Démarrer une séance libre</button>
         </section>
       )}
 
@@ -240,20 +181,8 @@ export function HomePage() {
         </ul>
       </section>
 
-      <Dialog open={startFor !== undefined} onClose={() => setStartFor(undefined)}
-        title={startFor ? `Démarrer : ${startFor.name}` : 'Démarrer une séance libre'}>
-        <form onSubmit={onStart} className="stack">
-          <div className="field">
-            <label htmlFor="gym">Dans quelle salle es-tu ?</label>
-            <select id="gym" name="gym" defaultValue={gymForWorkout} aria-describedby="gym-help">
-              <option value="">Aucune salle précise</option>
-              {gyms.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-            <span id="gym-help" className="hint">Seuls les exercices réalisables avec les machines de cette salle seront proposés.</span>
-          </div>
-          <ErrorMessage error={error} />
-          <button type="submit" className="primary" disabled={pending} autoFocus>C’est parti</button>
-        </form>
+      <Dialog open={picker !== undefined} onClose={() => setPicker(undefined)} title="Démarrer une séance">
+        {picker && userId && <StartSessionPicker key={picker.key} athleteId={userId} initial={picker.initial} />}
       </Dialog>
     </div>
   )

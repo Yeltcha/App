@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
 import { supabase, unwrap } from '../lib/supabase'
@@ -12,6 +12,7 @@ import { formatDuration, formatShortDate } from '../lib/dates'
 import { groupByExercise } from '../lib/sessionSets'
 import { machineLabel, matchesExercise } from '../lib/machines'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
+import { StartSessionPicker } from '../components/StartSessionPicker'
 import { Empty, ErrorMessage, Loading } from '../components/Feedback'
 import { RestTimer } from '../components/RestTimer'
 import { BarLoad } from '../components/BarLoad'
@@ -33,9 +34,8 @@ export default function ActiveSessionPage() {
   if (!active.data) {
     return (
       <div className="stack">
-        <h1>Séance</h1>
-        <Empty>Aucune séance en cours. Démarre la prochaine séance de ton programme ou une séance libre depuis l’accueil.</Empty>
-        <Link to="/" className="button primary cta">Démarrer une séance</Link>
+        <h1>Démarrer une séance</h1>
+        {profile && <StartSessionPicker athleteId={profile.id} />}
       </div>
     )
   }
