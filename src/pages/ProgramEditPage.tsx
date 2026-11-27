@@ -70,6 +70,8 @@ export default function ProgramEditPage() {
   if (data.isPending) return <Loading />
   if (data.error) return <ErrorMessage error={data.error} />
   const { program, workouts } = data.data
+  // Numéro de chaque séance dans le cycle (les séances bonus n'en ont pas)
+  const cycleNumbers = new Map(workouts.filter((w) => !w.is_bonus).map((w, i) => [w.id, i + 1]))
 
   async function saveProgram(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -93,6 +95,7 @@ export default function ProgramEditPage() {
     const position = workouts.length ? Math.max(...workouts.map((w) => w.position)) + 1 : 0
     if (await check(supabase.from('workouts').insert({
       program_id: program.id, name: String(f.get('w_name')).trim(), gym_id: String(f.get('w_gym')) || null, position,
+      is_bonus: f.get('w_bonus') === 'on',
     }))) {
       setAddingWorkout(false)
       await refresh()
@@ -142,7 +145,7 @@ export default function ProgramEditPage() {
     if (error) return setError(error.message)
     for (const w of workouts) {
       const { data: nw, error: we } = await supabase.from('workouts').insert({
-        program_id: (copy as Program).id, name: w.name, position: w.position, gym_id: w.gym_id, notes: w.notes,
+        program_id: (copy as Program).id, name: w.name, position: w.position, gym_id: w.gym_id, notes: w.notes, is_bonus: w.is_bonus,
       }).select().single()
       if (we) return setError(we.message)
       if (w.exercises.length) {
@@ -203,7 +206,7 @@ export default function ProgramEditPage() {
           <button type="button" className="primary" onClick={() => setAddingWorkout(true)}>+ Ajouter une séance</button>
         </div>
         <div className="row between wrap">
-          <p className="hint">L’ordre des séances définit le cycle : après la dernière, on revient à la première.</p>
+          <p className="hint">L’ordre des séances définit le cycle : après la dernière, on revient à la première. Les séances bonus restent hors du cycle, à faire au plaisir.</p>
           {workouts.length > 1 && (
             <button type="button" className="link" onClick={() => folded.setAll(folded.count ? [] : workouts.map((w) => w.id))}>
               {folded.count ? 'Tout déplier' : 'Tout replier'}
@@ -216,7 +219,10 @@ export default function ProgramEditPage() {
             <li key={w.id} className={folded.isCollapsed(w.id) ? 'card stack collapsed' : 'card stack'}>
               <div className="row between wrap">
                 <div className="item-text">
-                  <h3>{wi + 1}. {w.name}</h3>
+                  <h3>
+                    {w.is_bonus ? <span className="bonus-tag">Bonus</span> : `${cycleNumbers.get(w.id)}. `}
+                    {w.name}
+                  </h3>
                   {folded.isCollapsed(w.id) && (
                     <span className="muted small">
                       {w.exercises.length} exercice{w.exercises.length > 1 ? 's' : ''}
@@ -236,6 +242,7 @@ export default function ProgramEditPage() {
               </div>
               <div id={`workout-body-${w.id}`} className="stack" hidden={folded.isCollapsed(w.id)}>
               <WorkoutGymField workout={w} gyms={gyms.data ?? []} onSaved={refresh} />
+              <WorkoutBonusField workout={w} onSaved={refresh} />
               {w.exercises.length === 0 ? <p className="muted small">Aucun exercice.</p> : (
                 <ol className="plain-list exercise-plan">
                   {(() => {
@@ -283,6 +290,10 @@ export default function ProgramEditPage() {
               {gyms.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
+          <label className="check-row">
+            <input type="checkbox" name="w_bonus" />
+            Séance bonus : hors du cycle, à faire au plaisir
+          </label>
           <button type="submit" className="primary">Ajouter</button>
         </form>
       </Dialog>
@@ -317,6 +328,19 @@ export default function ProgramEditPage() {
       <ConfirmDialog open={confirm !== null} title={confirm?.title ?? ''} message={confirm?.message ?? ''} confirmLabel="Supprimer"
         onConfirm={async () => { const c = confirm; setConfirm(null); await c?.action() }} onCancel={() => setConfirm(null)} />
     </div>
+  )
+}
+
+function WorkoutBonusField({ workout, onSaved }: { workout: Workout; onSaved: () => void }) {
+  return (
+    <label className="check-row">
+      <input type="checkbox" defaultChecked={workout.is_bonus}
+        onChange={async (e) => {
+          await supabase.from('workouts').update({ is_bonus: e.target.checked }).eq('id', workout.id)
+          onSaved()
+        }} />
+      Séance bonus : hors du cycle, à faire au plaisir
+    </label>
   )
 }
 

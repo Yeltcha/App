@@ -135,13 +135,15 @@ try {
   await coach.getByLabel('Attribuer à').selectOption({ label: ATHLETE.name })
   await coach.getByRole('button', { name: 'Créer et ajouter les séances' }).click()
   await coach.getByRole('heading', { name: 'Force 5x5' }).waitFor()
-  for (const name of ['Jambes', 'Haut du corps']) {
+  for (const name of ['Jambes', 'Haut du corps', 'Bras plaisir']) {
     await coach.getByRole('button', { name: '+ Ajouter une séance' }).click()
     await coach.getByLabel('Nom de la séance').fill(name)
     if (name === 'Jambes') await coach.getByLabel('Salle de la séance').selectOption({ label: 'Salle Centre' })
+    if (name === 'Bras plaisir') await coach.getByRole('dialog').getByLabel('Séance bonus : hors du cycle, à faire au plaisir').check()
     await coach.getByRole('button', { name: 'Ajouter', exact: true }).click()
     await coach.getByRole('heading', { name: new RegExp(name) }).waitFor()
   }
+  assert(await coach.getByRole('heading', { name: 'Bonus Bras plaisir' }).isVisible(), 'séance bonus marquée, sans numéro dans le cycle')
   const jambes = coach.getByRole('listitem').filter({ has: coach.getByRole('heading', { name: '1. Jambes' }) })
   await jambes.getByRole('button', { name: '+ Ajouter un exercice' }).click()
   await coach.getByLabel('Exercice').selectOption({ label: 'Squat barre' })
@@ -224,6 +226,8 @@ try {
   const recommended = choices.locator('.workout-choice.recommended')
   assert((await recommended.count()) === 1 && /Jambes/.test(await recommended.textContent()), 'la séance conseillée (Jambes) est mise en avant')
   assert(await athlete.getByRole('button', { name: 'Démarrer une séance libre' }).isVisible(), 'bouton séance libre')
+  assert((await choices.getByRole('button').count()) === 2, 'le cycle ne contient pas la séance bonus')
+  assert(await athlete.getByRole('list', { name: 'Séances bonus' }).getByRole('button', { name: /Bras plaisir/ }).isVisible(), 'la séance bonus est listée à part')
   await shot(athlete, '05b-choix-seance')
   await athlete.getByRole('button', { name: 'Démarrer une séance libre' }).click()
   await athlete.getByText('Tu choisis tes exercices au fil de l’eau').waitFor()
