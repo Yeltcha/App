@@ -110,6 +110,8 @@ export interface Workout {
   position: number
   gym_id: string | null
   notes: string | null
+  /** Séance bonus : hors du cycle, jamais suggérée comme prochaine séance */
+  is_bonus: boolean
 }
 
 export interface WorkoutExercise {

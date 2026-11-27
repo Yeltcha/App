@@ -31,6 +31,9 @@ insert into public.programs (id, name, athlete_id) values ('40000000-0000-0000-0
 insert into public.workouts (id, program_id, name, position) values
   ('50000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', 'Jambes', 0),
   ('50000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000001', 'Haut du corps', 1);
+-- Séance bonus : hors du cycle
+insert into public.workouts (id, program_id, name, position, is_bonus) values
+  ('50000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000001', 'Bras bonus', 2, true);
 insert into public.workout_exercises (workout_id, exercise_id, position) values ('50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 0);
 
 -- Marques de salle : la marque saisie sur une machine est rattachée à la salle
@@ -105,6 +108,14 @@ do $$ begin
   assert (select volume_kg from public.session_summaries) = 1025, 'volume des séries faites';
   assert (select estimated_1rm_kg from public.exercise_progress) = 122.5, '1RM estimé Epley';
   assert (select name from public.next_workout()) = 'Haut du corps', 'séance suivante suggérée';
+end $$;
+
+-- Une séance bonus faite après ne fait pas avancer le cycle
+insert into public.sessions (workout_id, name, started_at, ended_at)
+values ('50000000-0000-0000-0000-000000000003', 'Bras bonus', now() - interval '4 minutes', now() - interval '1 minute');
+do $$ begin
+  assert (select name from public.next_workout()) = 'Haut du corps', 'la séance bonus ne compte pas dans le cycle';
+  assert (select count(*) from public.next_workout() where is_bonus) = 0, 'une séance bonus n’est jamais suggérée';
 end $$;
 
 -- Une seule séance en cours

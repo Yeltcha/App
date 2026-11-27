@@ -81,8 +81,9 @@ export function HomePage() {
   })
 
   const firstName = profile?.full_name.split(' ')[0] || ''
-  const cycleIndex = program.data && next.data ? program.data.workouts.findIndex((w) => w.id === next.data!.id) : -1
-  const cycle = cycleIndex >= 0 ? { index: cycleIndex + 1, total: program.data!.workouts.length } : null
+  const cycleWorkouts = program.data?.workouts.filter((w) => !w.is_bonus) ?? []
+  const cycleIndex = next.data ? cycleWorkouts.findIndex((w) => w.id === next.data!.id) : -1
+  const cycle = cycleIndex >= 0 ? { index: cycleIndex + 1, total: cycleWorkouts.length } : null
 
   return (
     <div className="stack-lg">
@@ -134,9 +135,19 @@ export function HomePage() {
         </section>
       ) : (
         <section className="card today" aria-labelledby="next-title">
-          <h2 className="today-title" id="next-title">Séance libre</h2>
-          <p className="muted">Aucun programme ne t’est attribué pour l’instant. Lance une séance libre et choisis tes exercices au fil de l’eau.</p>
-          <button type="button" className="primary cta" onClick={() => openPicker(null)}>Démarrer une séance libre</button>
+          {program.data && program.data.workouts.length > 0 ? (
+            <>
+              <h2 className="today-title" id="next-title">Séance bonus</h2>
+              <p className="muted">Ton programme {program.data.name} n’a que des séances bonus : choisis celle qui te fait envie.</p>
+              <button type="button" className="primary cta" onClick={() => openPicker()}>Choisir une séance</button>
+            </>
+          ) : (
+            <>
+              <h2 className="today-title" id="next-title">Séance libre</h2>
+              <p className="muted">Aucun programme ne t’est attribué pour l’instant. Lance une séance libre et choisis tes exercices au fil de l’eau.</p>
+              <button type="button" className="primary cta" onClick={() => openPicker(null)}>Démarrer une séance libre</button>
+            </>
+          )}
         </section>
       )}
 

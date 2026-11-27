@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { ACTIVE_SESSION_KEY, startSession } from '../lib/sessions'
 import { useGyms } from '../lib/queries'
-import { useMyProgram, useNextWorkout } from '../lib/program'
+import { useMyProgram, useNextWorkout, type ProgramWithWorkouts } from '../lib/program'
 import type { Workout } from '../lib/types'
 import { ErrorMessage, Loading } from './Feedback'
 
@@ -55,7 +55,7 @@ export function StartSessionPicker({ athleteId, initial }: StartSessionPickerPro
     return (
       <form onSubmit={onStart} className="stack">
         <div className="start-chosen">
-          <span className="today-label">{choice ? 'Séance du programme' : 'Séance libre'}</span>
+          <span className="today-label">{choice ? (choice.is_bonus ? 'Séance bonus' : 'Séance du programme') : 'Séance libre'}</span>
           <strong>{choice ? choice.name : 'Tu choisis tes exercices au fil de l’eau'}</strong>
           <button type="button" className="link" onClick={() => setChoice(undefined)}>Changer de séance</button>
         </div>
@@ -76,31 +76,48 @@ export function StartSessionPicker({ athleteId, initial }: StartSessionPickerPro
   if (program.isPending || next.isPending) return <Loading />
   if (program.error) return <ErrorMessage error={program.error} />
 
+  const cycle = program.data?.workouts.filter((w) => !w.is_bonus) ?? []
+  const bonus = program.data?.workouts.filter((w) => w.is_bonus) ?? []
+
+  function choiceButton(w: ProgramWithWorkouts['workouts'][number], marker: string) {
+    const recommended = w.id === next.data?.id
+    const gym = gymName(w.gym_id)
+    const classes = ['workout-choice', recommended && 'recommended', w.is_bonus && 'bonus'].filter(Boolean).join(' ')
+    return (
+      <li key={w.id}>
+        <button type="button" className={classes} onClick={() => setChoice(w)}>
+          <span className="workout-choice-index" aria-hidden="true">{marker}</span>
+          <span className="workout-choice-text">
+            <span className="workout-choice-name">{w.name}</span>
+            <span className="muted small">
+              {w.exerciseCount} exercice{w.exerciseCount > 1 ? 's' : ''}{gym ? ` · ${gym}` : ''}
+            </span>
+          </span>
+          {recommended && <span className="badge">Conseillée</span>}
+        </button>
+      </li>
+    )
+  }
+
   return (
     <div className="stack">
       {program.data && program.data.workouts.length > 0 ? (
         <>
           <p className="muted">Programme : {program.data.name}</p>
-          <ul className="workout-choices" aria-label="Séances du programme">
-            {program.data.workouts.map((w, index) => {
-              const recommended = w.id === next.data?.id
-              const gym = gymName(w.gym_id)
-              return (
-                <li key={w.id}>
-                  <button type="button" className={recommended ? 'workout-choice recommended' : 'workout-choice'} onClick={() => setChoice(w)}>
-                    <span className="workout-choice-index" aria-hidden="true">{index + 1}</span>
-                    <span className="workout-choice-text">
-                      <span className="workout-choice-name">{w.name}</span>
-                      <span className="muted small">
-                        {w.exerciseCount} exercice{w.exerciseCount > 1 ? 's' : ''}{gym ? ` · ${gym}` : ''}
-                      </span>
-                    </span>
-                    {recommended && <span className="badge">Conseillée</span>}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          {cycle.length > 0 && (
+            <ul className="workout-choices" aria-label="Séances du programme">
+              {cycle.map((w, index) => choiceButton(w, String(index + 1)))}
+            </ul>
+          )}
+          {bonus.length > 0 && (
+            <section className="stack-sm" aria-labelledby="bonus-title">
+              <h2 className="workout-choices-title" id="bonus-title">Séances bonus</h2>
+              <p className="hint">Hors du cycle, à faire au plaisir : elles ne changent pas la prochaine séance conseillée.</p>
+              <ul className="workout-choices" aria-label="Séances bonus">
+                {bonus.map((w) => choiceButton(w, '★'))}
+              </ul>
+            </section>
+          )}
         </>
       ) : (
         <p className="muted">Aucun programme ne t’est attribué pour l’instant. Lance une séance libre et choisis tes exercices au fil de l’eau.</p>
