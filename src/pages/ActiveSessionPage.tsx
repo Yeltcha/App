@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
@@ -21,7 +21,7 @@ import { useCollapsed } from '../lib/collapsed'
 import { ProgressRing } from '../components/ProgressRing'
 import { isBarbellExercise } from '../lib/plates'
 import { readRestEnd, writeRestEnd } from '../lib/restStorage'
-import { restsAfter, sessionSupersets, slotLabel } from '../lib/superset'
+import { restsAfter, sessionSupersets, slotLabel, splitSuperset } from '../lib/superset'
 import { formatRpe, percentOf1RM, RPE_VALUES, rirFor } from '../lib/rpe'
 import { SET_KIND_LABELS } from '../lib/setPlan'
 import { dropAnchor, planDropSet, setLabels } from '../lib/dropSet'
@@ -101,6 +101,7 @@ function SessionRunner({ session }: { session: Session }) {
       .eq('session_id', session.id)) as SessionExerciseNote[]).map((n) => [n.exercise_position, n.note])),
   })
   const [reordering, setReordering] = useState(false)
+  const [removing, setRemoving] = useState<{ position: number; name: string } | null>(null)
   const folded = useCollapsed(`praug:seance-repliee:${session.id}`, 'session')
 
   const exerciseIds = useMemo(
@@ -205,6 +206,26 @@ function SessionRunner({ session }: { session: Session }) {
     await Promise.all([sets.refetch(), notes.refetch()])
   }
 
+  async function removeExercise(position: number) {
+    setRemoving(null)
+    const [del, delNote] = await Promise.all([
+      supabase.from('session_sets').delete().eq('session_id', session.id).eq('exercise_position', position),
+      supabase.from('session_exercise_notes').delete().eq('session_id', session.id).eq('exercise_position', position),
+    ])
+    const failed = del.error ?? delNote.error
+    if (failed) setError(failed.message)
+    await Promise.all([sets.refetch(), notes.refetch()])
+  }
+
+  async function unlinkSuperset(index: number) {
+    const split = splitSuperset(groups.map(([position, group]) => ({ position, group: group[0].superset_group })), index)
+    if (!split) return
+    const { error } = await supabase.from('session_sets').update({ superset_group: split.group })
+      .eq('session_id', session.id).in('exercise_position', split.positions)
+    if (error) setError(error.message)
+    await sets.refetch()
+  }
+
   async function saveNote(position: number, text: string) {
     const note = text.trim()
     const current = notes.data?.get(position) ?? ''
@@ -284,12 +305,14 @@ function SessionRunner({ session }: { session: Session }) {
 
       {sets.isPending && <Loading />}
       {groups.length === 0 && !sets.isPending && <Empty>Ajoute un premier exercice pour commencer.</Empty>}
-      {groups.length > 1 && (
+      {groups.length > 0 && (
         <div className="fold-all">
-          <button type="button" className="link" onClick={() => setReordering(true)}>Changer l’ordre</button>
-          <button type="button" className="link" onClick={() => folded.setAll(folded.count ? [] : groups.map(([p]) => String(p)))}>
-            {folded.count ? 'Tout déplier' : 'Tout replier'}
-          </button>
+          <button type="button" className="link" onClick={() => setReordering(true)}>Organiser les exercices</button>
+          {groups.length > 1 && (
+            <button type="button" className="link" onClick={() => folded.setAll(folded.count ? [] : groups.map(([p]) => String(p)))}>
+              {folded.count ? 'Tout déplier' : 'Tout replier'}
+            </button>
+          )}
         </div>
       )}
 
@@ -404,17 +427,32 @@ function SessionRunner({ session }: { session: Session }) {
 
       <RestTimer endsAt={restEndsAt} onChange={setRestEndsAt} />
 
-      <Dialog open={reordering} onClose={() => setReordering(false)} title="Ordre des exercices">
+      <Dialog open={reordering} onClose={() => setReordering(false)} title="Organiser les exercices">
+        {groups.length === 0 && <p className="muted">Aucun exercice dans cette séance.</p>}
         <ol className="plain-list reorder-list">
           {groups.map(([position, group], index) => {
             const name = exerciseMap.get(group[0].exercise_id)?.name ?? 'Exercice'
+            const slot = supersets.get(position)
+            const linkedToNext = slot !== undefined && slot.order < slot.size
+            const nextName = linkedToNext ? exerciseMap.get(groups[index + 1][1][0].exercise_id)?.name ?? 'l’exercice suivant' : ''
             return (
-              <li key={position}>
-                <span className="station" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                <span className="reorder-name">{name}</span>
-                <button type="button" className="icon-button" aria-label={`Monter ${name}`} disabled={index === 0} onClick={() => moveExercise(index, -1)}>↑</button>
-                <button type="button" className="icon-button" aria-label={`Descendre ${name}`} disabled={index === groups.length - 1} onClick={() => moveExercise(index, 1)}>↓</button>
-              </li>
+              <Fragment key={position}>
+                <li>
+                  <span className="station" aria-hidden="true">{slot ? slotLabel(slot) : String(index + 1).padStart(2, '0')}</span>
+                  <span className="reorder-name">{name}</span>
+                  <button type="button" className="icon-button" aria-label={`Monter ${name}`} disabled={index === 0} onClick={() => moveExercise(index, -1)}>↑</button>
+                  <button type="button" className="icon-button" aria-label={`Descendre ${name}`} disabled={index === groups.length - 1} onClick={() => moveExercise(index, 1)}>↓</button>
+                  <button type="button" className="icon-button" aria-label={`Supprimer ${name}`} onClick={() => setRemoving({ position, name })}>✕</button>
+                </li>
+                {linkedToNext && (
+                  <li className="superset-unlink">
+                    <span className="superset-tag">Superset {slot.letter}</span>
+                    <button type="button" className="link" aria-label={`Défaire le superset entre ${name} et ${nextName}`} onClick={() => unlinkSuperset(index)}>
+                      Défaire le superset
+                    </button>
+                  </li>
+                )}
+              </Fragment>
             )
           })}
         </ol>
@@ -438,6 +476,10 @@ function SessionRunner({ session }: { session: Session }) {
           <button type="submit" className="primary" autoFocus>Enregistrer la séance</button>
         </form>
       </Dialog>
+
+      <ConfirmDialog open={removing !== null} title={`Supprimer ${removing?.name ?? 'l’exercice'} ?`}
+        message="L’exercice, ses séries et son commentaire seront retirés de cette séance."
+        confirmLabel="Supprimer" onConfirm={() => removing && removeExercise(removing.position)} onCancel={() => setRemoving(null)} />
 
       <ConfirmDialog open={abandoning} title="Abandonner la séance ?"
         message="La séance en cours et toutes ses séries seront supprimées."

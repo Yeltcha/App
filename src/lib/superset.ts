@@ -56,3 +56,19 @@ export function sessionSupersets(exercises: { position: number; group: number | 
 
 /** Après une série, on enchaîne sans repos tant que ce n'est pas le dernier exercice du superset. */
 export const restsAfter = (slot: SupersetSlot | null | undefined) => !slot || slot.order === slot.size
+
+/**
+ * Défaire le lien entre l'exercice `index` et le suivant dans une séance :
+ * les exercices qui suivaient dans le même superset forment un nouveau groupe
+ * (s'il n'en reste qu'un, il redevient un exercice seul).
+ * Renvoie les positions à renuméroter et leur nouveau numéro de groupe.
+ */
+export function splitSuperset(exercises: { position: number; group: number | null }[], index: number): { positions: number[]; group: number } | null {
+  const sorted = [...exercises].sort((a, b) => a.position - b.position)
+  const group = sorted[index]?.group
+  if (group === null || group === undefined || sorted[index + 1]?.group !== group) return null
+  const positions: number[] = []
+  for (let i = index + 1; i < sorted.length && sorted[i].group === group; i++) positions.push(sorted[i].position)
+  const next = Math.max(...sorted.map((e) => e.group ?? -1)) + 1
+  return { positions, group: next }
+}
