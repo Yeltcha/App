@@ -6,7 +6,7 @@ import { supabase, unwrap } from '../lib/supabase'
 import { byId, useEquipment, useExercises, useGymExercises, useGyms } from '../lib/queries'
 import { ACTIVE_SESSION_KEY, lastSessionSets, useActiveSession } from '../lib/sessions'
 import type { PreviousSet } from '../lib/lastSession'
-import { MUSCLE_LABELS, type Exercise, type Session, type SessionSet, type WorkoutExercise } from '../lib/types'
+import { MUSCLE_LABELS, type Exercise, type Session, type SessionExerciseNote, type SessionSet, type WorkoutExercise } from '../lib/types'
 import { decimalText, formatNumber, parseDecimal } from '../lib/numbers'
 import { formatDuration, formatShortDate } from '../lib/dates'
 import { groupByExercise } from '../lib/sessionSets'
@@ -24,6 +24,7 @@ import { readRestEnd, writeRestEnd } from '../lib/restStorage'
 import { restsAfter, sessionSupersets, slotLabel } from '../lib/superset'
 import { formatRpe, percentOf1RM, RPE_VALUES, rirFor } from '../lib/rpe'
 import { SET_KIND_LABELS } from '../lib/setPlan'
+import { dropAnchor, planDropSet, setLabels } from '../lib/dropSet'
 
 export default function ActiveSessionPage() {
   const { profile } = useAuth()
@@ -82,9 +83,24 @@ function SessionRunner({ session }: { session: Session }) {
     queryKey: ['session-plan', session.workout_id],
     enabled: Boolean(session.workout_id),
     queryFn: async () =>
-      unwrap(await supabase.from('workout_exercises').select('position, notes, notes_visible')
-        .eq('workout_id', session.workout_id!).order('position')) as Pick<WorkoutExercise, 'position' | 'notes' | 'notes_visible'>[],
+      unwrap(await supabase.from('workout_exercises').select('exercise_id, position, notes, notes_visible')
+        .eq('workout_id', session.workout_id!).order('position')) as Pick<WorkoutExercise, 'exercise_id' | 'position' | 'notes' | 'notes_visible'>[],
   })
+  // Consignes par exercice (l'ordre peut changer pendant la séance)
+  const planByExercise = useMemo(() => {
+    const map = new Map<string, Pick<WorkoutExercise, 'notes' | 'notes_visible'>>()
+    for (const p of plan.data ?? []) if (!map.has(p.exercise_id)) map.set(p.exercise_id, p)
+    return map
+  }, [plan.data])
+
+  // Commentaires de l'athlète, par exercice de la séance
+  const notesKey = ['session-notes', session.id]
+  const notes = useQuery({
+    queryKey: notesKey,
+    queryFn: async () => new Map((unwrap(await supabase.from('session_exercise_notes').select('*')
+      .eq('session_id', session.id)) as SessionExerciseNote[]).map((n) => [n.exercise_position, n.note])),
+  })
+  const [reordering, setReordering] = useState(false)
   const folded = useCollapsed(`praug:seance-repliee:${session.id}`, 'session')
 
   const exerciseIds = useMemo(
@@ -149,6 +165,55 @@ function SessionRunner({ session }: { session: Session }) {
     const { error } = await supabase.from('session_sets').delete().eq('id', set.id)
     if (error) setError(error.message)
     await sets.refetch()
+  }
+
+  async function addDropSet(group: SessionSet[]) {
+    const anchor = dropAnchor(group)
+    if (!anchor) return
+    const { renumber, chainEnd, drop } = planDropSet(group, anchor)
+    // On enchaîne tout de suite : pas de repos avant le drop
+    setRestEndsAt(null)
+    const results = await Promise.all([
+      ...renumber.map((r) => supabase.from('session_sets').update({ set_number: r.set_number }).eq('id', r.id)),
+      supabase.from('session_sets').update({ rest_sec: 0 }).eq('id', chainEnd.id),
+    ])
+    const failed = results.find((r) => r.error)
+    if (failed?.error) {
+      setError(failed.error.message)
+      return sets.refetch()
+    }
+    const { error } = await supabase.from('session_sets').insert({
+      session_id: session.id,
+      exercise_id: chainEnd.exercise_id,
+      equipment_id: chainEnd.equipment_id,
+      exercise_position: chainEnd.exercise_position,
+      specialty: chainEnd.specialty,
+      superset_group: chainEnd.superset_group,
+      set_kind: 'drop',
+      ...drop,
+    })
+    if (error) setError(error.message)
+    await sets.refetch()
+  }
+
+  async function moveExercise(index: number, delta: -1 | 1) {
+    const a = groups[index]?.[0]
+    const b = groups[index + delta]?.[0]
+    if (a === undefined || b === undefined) return
+    const { error } = await supabase.rpc('swap_session_exercises', { p_session: session.id, p_a: a, p_b: b })
+    if (error) setError(error.message)
+    await Promise.all([sets.refetch(), notes.refetch()])
+  }
+
+  async function saveNote(position: number, text: string) {
+    const note = text.trim()
+    const current = notes.data?.get(position) ?? ''
+    if (note === current) return
+    const { error } = note
+      ? await supabase.from('session_exercise_notes').upsert({ session_id: session.id, exercise_position: position, note, updated_at: new Date().toISOString() })
+      : await supabase.from('session_exercise_notes').delete().eq('session_id', session.id).eq('exercise_position', position)
+    if (error) setError(error.message)
+    await queryClient.invalidateQueries({ queryKey: notesKey })
   }
 
   async function addExercise(exercise: Exercise) {
@@ -221,6 +286,7 @@ function SessionRunner({ session }: { session: Session }) {
       {groups.length === 0 && !sets.isPending && <Empty>Ajoute un premier exercice pour commencer.</Empty>}
       {groups.length > 1 && (
         <div className="fold-all">
+          <button type="button" className="link" onClick={() => setReordering(true)}>Changer l’ordre</button>
           <button type="button" className="link" onClick={() => folded.setAll(folded.count ? [] : groups.map(([p]) => String(p)))}>
             {folded.count ? 'Tout déplier' : 'Tout replier'}
           </button>
@@ -246,8 +312,10 @@ function SessionRunner({ session }: { session: Session }) {
         const collapsed = folded.isCollapsed(String(position))
         const bodyId = `ex-body-${position}`
         const doneHere = group.filter((s) => s.done).length
-        const planned = plan.data?.[position]
+        const planned = planByExercise.get(group[0].exercise_id)
         const showNotes = planned?.notes_visible ?? true
+        const labels = setLabels(group)
+        const anchor = dropAnchor(group)
         const supersetClass = slot ? ` in-superset${slot.order === 1 ? ' superset-first' : ''}${slot.order === slot.size ? ' superset-last' : ''}` : ''
         return (
           <section key={position} className={`card exercise-block${supersetClass}${collapsed ? ' collapsed' : ''}`} aria-labelledby={headingId}>
@@ -303,14 +371,24 @@ function SessionRunner({ session }: { session: Session }) {
               <tbody>
                 {group.map((set) => (
                   <SetRow key={set.id} set={set} exerciseName={exercise?.name ?? ''} cardio={cardio} withRpe={withRpe} showTarget={varied}
-                    before={prev?.sets[set.set_number - 1]}
+                    label={labels.get(set.id)!}
+                    before={set.set_kind === 'drop' ? undefined : prev?.sets[labels.get(set.id)!.number - 1]}
                     onUpdate={(patch) => updateSet(set.id, patch)}
                     onToggle={() => toggleDone(set)}
                     onRemove={() => removeSet(set)} />
                 ))}
               </tbody>
             </table>
-            <button type="button" className="add-set" onClick={() => addSet(group)}>+ Ajouter une série</button>
+            <div className="set-actions">
+              <button type="button" className="add-set" onClick={() => addSet(group)}>+ Ajouter une série</button>
+              {!cardio && anchor && (
+                <button type="button" className="add-set" onClick={() => addDropSet(group)}>
+                  + Drop set après la série {labels.get(anchor.id)!.number}
+                </button>
+              )}
+            </div>
+            <ExerciseNote key={`${position}:${notes.data?.get(position) ?? ''}`} exerciseName={exercise?.name ?? 'l’exercice'} position={position}
+              note={notes.data?.get(position) ?? ''} onSave={(text) => saveNote(position, text)} />
             </div>
           </section>
         )
@@ -325,6 +403,23 @@ function SessionRunner({ session }: { session: Session }) {
       </div>
 
       <RestTimer endsAt={restEndsAt} onChange={setRestEndsAt} />
+
+      <Dialog open={reordering} onClose={() => setReordering(false)} title="Ordre des exercices">
+        <ol className="plain-list reorder-list">
+          {groups.map(([position, group], index) => {
+            const name = exerciseMap.get(group[0].exercise_id)?.name ?? 'Exercice'
+            return (
+              <li key={position}>
+                <span className="station" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                <span className="reorder-name">{name}</span>
+                <button type="button" className="icon-button" aria-label={`Monter ${name}`} disabled={index === 0} onClick={() => moveExercise(index, -1)}>↑</button>
+                <button type="button" className="icon-button" aria-label={`Descendre ${name}`} disabled={index === groups.length - 1} onClick={() => moveExercise(index, 1)}>↓</button>
+              </li>
+            )
+          })}
+        </ol>
+        <button type="button" className="primary" onClick={() => setReordering(false)}>Terminé</button>
+      </Dialog>
 
       <Dialog open={picking} onClose={() => setPicking(false)} title="Ajouter un exercice">
         <ExercisePicker gymId={session.gym_id} onPick={addExercise} />
@@ -371,6 +466,8 @@ interface SetRowProps {
   withRpe: boolean
   /** Les séries diffèrent : on affiche le type et le RPE cible de chacune */
   showTarget: boolean
+  /** Numéro affiché ; un drop set porte le numéro de sa série */
+  label: { number: number; drop: number | null }
   /** La même série lors de la dernière séance */
   before: PreviousSet | undefined
   onUpdate: (patch: Partial<SessionSet>) => void
@@ -378,9 +475,9 @@ interface SetRowProps {
   onRemove: () => void
 }
 
-const KIND_SHORT: Record<SessionSet['set_kind'], string> = { normal: '', warmup: 'Éch.', top: 'Top', backoff: 'B-off' }
+const KIND_SHORT: Record<SessionSet['set_kind'], string> = { normal: '', warmup: 'Éch.', top: 'Top', backoff: 'B-off', drop: '' }
 
-function SetRow({ set, exerciseName, cardio, withRpe, showTarget, before, onUpdate, onToggle, onRemove }: SetRowProps) {
+function SetRow({ set, exerciseName, cardio, withRpe, showTarget, label: shown, before, onUpdate, onToggle, onRemove }: SetRowProps) {
   // État local pour que la case réagisse immédiatement, avant la réponse du serveur
   const [done, setDone] = useState(set.done)
   const [syncedDone, setSyncedDone] = useState(set.done)
@@ -388,7 +485,7 @@ function SetRow({ set, exerciseName, cardio, withRpe, showTarget, before, onUpda
     setSyncedDone(set.done)
     setDone(set.done)
   }
-  const label = `${exerciseName}, série ${set.set_number}`
+  const label = shown.drop ? `${exerciseName}, drop set ${shown.drop} de la série ${shown.number}` : `${exerciseName}, série ${shown.number}`
   function commitWeight(input: HTMLInputElement) {
     const value = parseDecimal(input.value)
     if (value === null || value > 1000) {
@@ -410,10 +507,10 @@ function SetRow({ set, exerciseName, cardio, withRpe, showTarget, before, onUpda
     if (value !== set.reps) onUpdate({ reps: value })
   }
   return (
-    <tr className={done ? 'done' : undefined}>
+    <tr className={[done && 'done', shown.drop && 'drop-row'].filter(Boolean).join(' ') || undefined}>
       <th scope="row">
-        {set.set_number}
-        {showTarget && (
+        {shown.drop ? <span className="drop-label" title="Drop set : enchaîné sans repos, charge réduite"><span aria-hidden="true">↳ </span>Drop</span> : shown.number}
+        {showTarget && !shown.drop && (
           <span className="set-target">
             {KIND_SHORT[set.set_kind] && <span title={SET_KIND_LABELS[set.set_kind]}>{KIND_SHORT[set.set_kind]}</span>}
             {set.target_rpe !== null && <span>@{formatRpe(Number(set.target_rpe))}</span>}
@@ -489,6 +586,26 @@ function ExercisePicker({ gymId, onPick }: { gymId: string | null; onPick: (e: E
         ))}
       </ul>
       {!available.isPending && list.length === 0 && <Empty>Aucun exercice ne correspond.</Empty>}
+    </div>
+  )
+}
+
+function ExerciseNote({ exerciseName, position, note, onSave }: { exerciseName: string; position: number; note: string; onSave: (text: string) => void }) {
+  const [open, setOpen] = useState(note !== '')
+  const id = `note-${position}`
+  if (!open) {
+    return <button type="button" className="link add-note" onClick={() => setOpen(true)}>+ Ajouter un commentaire</button>
+  }
+  return (
+    <div className="field exercise-note">
+      <label htmlFor={id}>Commentaire (facultatif)</label>
+      <textarea id={id} rows={2} defaultValue={note} maxLength={1000} autoFocus={note === ''}
+        aria-label={`Commentaire (facultatif), ${exerciseName}`}
+        placeholder="Ressenti, douleur, machine occupée…"
+        onBlur={(e) => {
+          onSave(e.currentTarget.value)
+          if (!e.currentTarget.value.trim()) setOpen(false)
+        }} />
     </div>
   )
 }

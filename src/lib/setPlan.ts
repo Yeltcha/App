@@ -3,8 +3,9 @@ import { formatRpe, loadFromRpe, RPE_VALUES } from './rpe'
 import type { ReferenceMax } from './oneRepMax'
 import type { Specialty, WorkoutExercise } from './types'
 
-export type SetKind = 'normal' | 'warmup' | 'top' | 'backoff'
+export type SetKind = 'normal' | 'warmup' | 'top' | 'backoff' | 'drop'
 
+/** Types proposés dans le programme (le drop set s'ajoute pendant la séance) */
 export const SET_KINDS: SetKind[] = ['normal', 'warmup', 'top', 'backoff']
 
 export const SET_KIND_LABELS: Record<SetKind, string> = {
@@ -12,6 +13,7 @@ export const SET_KIND_LABELS: Record<SetKind, string> = {
   warmup: 'Échauffement',
   top: 'Top set',
   backoff: 'Back-off',
+  drop: 'Drop set',
 }
 
 /** Une série programmée */

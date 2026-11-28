@@ -118,6 +118,22 @@ do $$ begin
   assert (select count(*) from public.next_workout() where is_bonus) = 0, 'une séance bonus n’est jamais suggérée';
 end $$;
 
+-- Pendant la séance : drop set, ordre des exercices, commentaire
+insert into public.session_sets (session_id, exercise_id, exercise_position, set_number, reps, weight_kg, set_kind) values
+  ('60000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000002', 1, 1, 10, 50, 'normal'),
+  ('60000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000002', 1, 2, 10, 40, 'drop');
+insert into public.session_exercise_notes (session_id, exercise_position, note)
+values ('60000000-0000-0000-0000-000000000001', 0, 'Genou un peu sensible');
+select public.swap_session_exercises('60000000-0000-0000-0000-000000000001', 0, 1);
+do $$ begin
+  assert (select count(*) from public.session_sets where set_kind = 'drop') = 1, 'drop set enregistré';
+  assert (select distinct exercise_position from public.session_sets
+          where exercise_id = '30000000-0000-0000-0000-000000000002') = 0, 'exercice remonté en première place';
+  assert (select distinct exercise_position from public.session_sets
+          where exercise_id = '30000000-0000-0000-0000-000000000001') = 1, 'exercice descendu en deuxième place';
+  assert (select exercise_position from public.session_exercise_notes) = 1, 'le commentaire suit son exercice';
+end $$;
+
 -- Une seule séance en cours
 insert into public.sessions (name) values ('En cours');
 do $$ begin
@@ -134,6 +150,7 @@ do $$ begin
   assert (select count(*) from public.programs) = 0, 'athlète 2 ne voit pas le programme de 1';
   assert (select count(*) from public.sessions) = 0, 'athlète 2 ne voit pas les séances de 1';
   assert (select count(*) from public.session_sets) = 0, 'athlète 2 ne voit pas les séries de 1';
+  assert (select count(*) from public.session_exercise_notes) = 0, 'athlète 2 ne voit pas les commentaires de 1';
   assert (select count(*) from public.body_weights) = 0, 'athlète 2 ne voit pas le poids de 1';
   assert (select count(*) from public.next_workout('00000000-0000-0000-0000-00000000000b')) = 0, 'pas de fuite via next_workout';
 end $$;
