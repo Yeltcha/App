@@ -170,6 +170,13 @@ export interface SessionSet {
   completed_at: string | null
 }
 
+/** Commentaire de l'athlète sur un exercice de la séance */
+export interface SessionExerciseNote {
+  session_id: string
+  exercise_position: number
+  note: string
+}
+
 export interface SessionSummary {
   session_id: string
   athlete_id: string

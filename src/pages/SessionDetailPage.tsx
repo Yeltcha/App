@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, unwrap } from '../lib/supabase'
 import { byId, useEquipment, useExercises, useGyms } from '../lib/queries'
-import type { Session, SessionSet } from '../lib/types'
+import type { Session, SessionExerciseNote, SessionSet } from '../lib/types'
 import { formatDuration, formatLongDate, localDateOf } from '../lib/dates'
 import { estimate1RM, formatKg } from '../lib/numbers'
 import { formatRpe } from '../lib/rpe'
@@ -30,13 +30,14 @@ export default function SessionDetailPage() {
       const session = unwrap(await supabase.from('sessions').select('*').eq('id', id!).single()) as Session
       const sets = unwrap(await supabase.from('session_sets').select('*').eq('session_id', id!)
         .order('exercise_position').order('set_number')) as SessionSet[]
-      return { session, sets }
+      const notes = unwrap(await supabase.from('session_exercise_notes').select('*').eq('session_id', id!)) as SessionExerciseNote[]
+      return { session, sets, notes: new Map(notes.map((n) => [n.exercise_position, n.note])) }
     },
   })
 
   if (data.isPending) return <Loading />
   if (data.error) return <ErrorMessage error={data.error} />
-  const { session, sets } = data.data
+  const { session, sets, notes } = data.data
 
   const groups = groupByExercise(sets)
   const supersets = sessionSupersets(groups.map(([position, g]) => ({ position, group: g[0].superset_group })))
@@ -87,6 +88,7 @@ export default function SessionDetailPage() {
               ))}
             </ol>
             {best > 0 && <p className="small muted">1RM estimé : {formatKg(best)}</p>}
+            {notes.get(pos) && <p className="exercise-comment"><span className="visually-hidden">Commentaire : </span>{notes.get(pos)}</p>}
           </section>
         )
       })}
